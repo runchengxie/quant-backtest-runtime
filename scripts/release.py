@@ -77,6 +77,20 @@ def switch(production: Path, commit: str, *, dry_run: bool) -> None:
     _replace_link(current, release)
 
 
+def rollback(production: Path, *, dry_run: bool) -> None:
+    """Return to the previous release, or deactivate a first installation."""
+    current = production / "current"
+    if not current.is_symlink():
+        raise ValueError("no active release to roll back")
+    previous = production / "previous"
+    if previous.is_symlink():
+        switch(production, previous.resolve().name, dry_run=dry_run)
+    elif dry_run:
+        print(f"would remove initial release pointer {current}")
+    else:
+        current.unlink()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Backtest runtime release management")
     parser.add_argument("--repo", type=Path, required=True)
@@ -94,10 +108,7 @@ def main() -> None:
     elif args.command == "switch":
         switch(production, args.commit, dry_run=args.dry_run)
     else:
-        previous = production / "previous"
-        if not previous.is_symlink():
-            raise ValueError("no previous release to restore")
-        switch(production, previous.resolve().name, dry_run=args.dry_run)
+        rollback(production, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":
