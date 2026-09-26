@@ -14,7 +14,13 @@ backtest-job = "backtest_runtime.cli:main"
 backtest-worker = "backtest_runtime.worker:main"
 
 [dependency-groups]
-dev = ["pytest>=9", "ruff>=0.8"]
+dev = [
+    "coverage>=7.10",
+    "pip-audit>=2.10.1",
+    "pytest>=9",
+    "ruff>=0.8",
+    "ty>=0.0.84",
+]
 
 [tool.uv.sources]
 quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "3ede35924d124ebdb2ada89bbcd23d3f9ced82b9" }
@@ -24,3 +30,21 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP", "C90", "RUF", "BLE"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.coverage.run]
+source = ["backtest_runtime"]
+branch = true
+patch = ["subprocess"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 75
+
+[tool.ty.environment]
+python-version = "3.12"

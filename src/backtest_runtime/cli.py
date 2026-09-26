@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import subprocess
 import sys
 from dataclasses import asdict
@@ -92,7 +93,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     try:
         if args.command == "submit":
-            if args.manifest.is_symlink() or args.manifest.stat().st_size > 64 * 1024:
+            manifest_stat = args.manifest.lstat()
+            if (
+                not stat.S_ISREG(manifest_stat.st_mode)
+                or manifest_stat.st_size > 64 * 1024
+            ):
                 raise ValueError(
                     "manifest must be a regular file no larger than 64 KiB"
                 )
@@ -114,6 +119,8 @@ def main(argv: list[str] | None = None) -> int:
         else:
             ref = service.get_result(args.job_id)
             row = store.get_backtest_job(args.job_id)
+            if row is None:
+                raise KeyError(f"Unknown backtest job: {args.job_id}")
             output = read_job_result(
                 args.result_root.resolve(),
                 job_id=args.job_id,

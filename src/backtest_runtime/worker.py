@@ -45,7 +45,6 @@ def _run_native_backend(
     import pandas as pd
     from portfolio_backtester import PositionBacktestConfig
     from portfolio_backtester.backends import (
-        BackendRegistry,
         NativePositionReplayBackend,
         NativePositionReplayRequest,
     )
@@ -57,7 +56,7 @@ def _run_native_backend(
         if ref is not None
     }
     config = PositionBacktestConfig(**request.config)
-    execution_values = request.execution["ledger_config"]
+    execution_values: dict[str, Any] = dict(request.execution["ledger_config"])
     if isinstance(execution_values.get("liquidity_cols"), list):
         execution_values = {
             **execution_values,
@@ -76,9 +75,9 @@ def _run_native_backend(
         ledger=request.execution["ledger"],
         ledger_config=ExecutionSimConfig(**execution_values),
     )
-    backends = BackendRegistry()
-    backends.register(NativePositionReplayBackend())
-    return backends.run(request.backend, backend_request)
+    result = NativePositionReplayBackend().run(backend_request)
+    result.validate()
+    return result
 
 
 def _manifest_for_result(

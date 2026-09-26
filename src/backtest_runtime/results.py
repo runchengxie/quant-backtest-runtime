@@ -36,45 +36,52 @@ def read_job_result(
         raise ValueError("Job result identity mismatch")
     schema = payload.get("schema_version")
     if schema == "quant.backtest_job_result.v2":
-        from portfolio_backtester.backtest_bundle_io import read_backtest_bundle
-
-        if payload.get("bundle_manifest_path") != "bundle/manifest.json":
-            raise ValueError("invalid official bundle path")
-        bundle = root / "bundle"
-        if bundle.is_symlink() or (bundle / "manifest.json").is_symlink():
-            raise ValueError("official bundle path is unsafe")
-        if _sha256(bundle / "manifest.json") != payload.get("bundle_manifest_sha256"):
-            raise ValueError("official bundle manifest SHA-256 mismatch")
-        official = read_backtest_bundle(bundle, verify_hashes=True)
-        if (
-            official.run_id != job_id
-            or official.evidence_tier.value != "execution_aware"
-        ):
-            raise ValueError("official bundle identity mismatch")
-        if official.artifact_envelope.get("configuration_sha256") != request_sha256:
-            raise ValueError("official bundle request fingerprint mismatch")
+        _verify_official_bundle(root, payload, job_id, request_sha256)
     elif schema == "ticknet.backtest_job_result.v1":
-        expected = {
-            "performance.parquet",
-            "positions.parquet",
-            "orders.parquet",
-            "fills.parquet",
-            "daily_ledger.parquet",
-        }
-        inventory = payload.get("inventory")
-        if not isinstance(inventory, list) or len(inventory) != 5:
-            raise ValueError("invalid diagnostic inventory")
-        paths = {item.get("path") for item in inventory if isinstance(item, dict)}
-        if paths != expected:
-            raise ValueError("invalid diagnostic frame set")
-        for item in inventory:
-            path = root / item["path"]
-            if path.is_symlink() or not path.is_file():
-                raise ValueError("diagnostic frame missing or unsafe")
-            if _sha256(path) != item.get("sha256") or path.stat().st_size != item.get(
-                "size_bytes"
-            ):
-                raise ValueError("diagnostic frame checksum mismatch")
+        _verify_diagnostic_frames(root, payload)
     else:
         raise ValueError("unsupported Job result schema")
     return payload
+
+
+def _verify_official_bundle(
+    root: Path, payload: dict[str, Any], job_id: str, request_sha256: str
+) -> None:
+    from portfolio_backtester.backtest_bundle_io import read_backtest_bundle
+
+    if payload.get("bundle_manifest_path") != "bundle/manifest.json":
+        raise ValueError("invalid official bundle path")
+    bundle = root / "bundle"
+    if bundle.is_symlink() or (bundle / "manifest.json").is_symlink():
+        raise ValueError("official bundle path is unsafe")
+    if _sha256(bundle / "manifest.json") != payload.get("bundle_manifest_sha256"):
+        raise ValueError("official bundle manifest SHA-256 mismatch")
+    official = read_backtest_bundle(bundle, verify_hashes=True)
+    if official.run_id != job_id or official.evidence_tier.value != "execution_aware":
+        raise ValueError("official bundle identity mismatch")
+    if official.artifact_envelope.get("configuration_sha256") != request_sha256:
+        raise ValueError("official bundle request fingerprint mismatch")
+
+
+def _verify_diagnostic_frames(root: Path, payload: dict[str, Any]) -> None:
+    expected = {
+        "performance.parquet",
+        "positions.parquet",
+        "orders.parquet",
+        "fills.parquet",
+        "daily_ledger.parquet",
+    }
+    inventory = payload.get("inventory")
+    if not isinstance(inventory, list) or len(inventory) != 5:
+        raise ValueError("invalid diagnostic inventory")
+    paths = {item.get("path") for item in inventory if isinstance(item, dict)}
+    if paths != expected:
+        raise ValueError("invalid diagnostic frame set")
+    for item in inventory:
+        path = root / item["path"]
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("diagnostic frame missing or unsafe")
+        if _sha256(path) != item.get("sha256") or path.stat().st_size != item.get(
+            "size_bytes"
+        ):
+            raise ValueError("diagnostic frame checksum mismatch")
