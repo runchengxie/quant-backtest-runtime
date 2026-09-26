@@ -13,7 +13,7 @@ uv sync --locked --group dev --python 3.13
 uv run --locked backtest-job --help
 ```
 
-依赖版本记录在 `uv.lock`，其中 `quant-platform` 固定到具体 Git 提交。开发和 CI 都使用锁定依赖。
+依赖版本记录在 `uv.lock`，其中 `quant-platform` 固定到具体 Git 提交。开发和 CI 都使用锁定依赖。运行时只安装平台基础依赖，不启用模型训练使用的 `ml` 安装组。
 
 ## 跑通一个合成示例
 
