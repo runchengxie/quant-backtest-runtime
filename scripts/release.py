@@ -49,14 +49,22 @@ def stage(repo: Path, production: Path, commit: str, *, dry_run: bool) -> Path:
         with tarfile.open(archive) as contents:
             contents.extractall(temporary / "source", filter="data")
         source = temporary / "source"
-        subprocess.run(["uv", "sync", "--locked", "--no-dev"], cwd=source, check=True)
         source.rename(destination)
+    # Venv entrypoints embed the absolute interpreter path, so install only
+    # after the source has reached its immutable release location.
+    subprocess.run(["uv", "sync", "--locked", "--no-dev"], cwd=destination, check=True)
+    (destination / ".release-ready").write_text(sha + "\n", encoding="ascii")
     return destination
 
 
 def switch(production: Path, commit: str, *, dry_run: bool) -> None:
     release = production / "releases" / commit
-    if not release.is_dir() or not (release / ".venv/bin/backtest-job").is_file():
+    if (
+        not release.is_dir()
+        or not (release / ".venv/bin/backtest-job").is_file()
+        or not (release / ".release-ready").is_file()
+        or (release / ".release-ready").read_text(encoding="ascii").strip() != commit
+    ):
         raise ValueError("release is missing or not installed")
     current = production / "current"
     previous = production / "previous"
