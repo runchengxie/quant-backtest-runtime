@@ -1,0 +1,26 @@
+name: runtime-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install locked dependencies
+        run: uv sync --locked --group dev --python 3.13
+      - name: Lint
+        run: uv run --locked ruff check src scripts tests
+      - name: Format
+        run: uv run --locked ruff format --check src scripts tests
+      - name: Backtest worker and release tests
+        run: uv run --locked pytest -q
