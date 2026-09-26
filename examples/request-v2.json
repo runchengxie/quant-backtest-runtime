@@ -1,0 +1,73 @@
+{
+  "schema_version": 2,
+  "idempotency_key": "synthetic-example-v2",
+  "inputs": {
+    "positions_ref": "artifact://sha256/5dbeff0b5589f1791afebd0d75cb94051a491a35b97818847c73693d14e66ebc",
+    "pricing_ref": "artifact://sha256/5680d67d2c05dcd253c83373645b0ec458f82b6500dda4fa61f5dad0777ca0b4",
+    "periods_ref": "artifact://sha256/d38ebfe5b54e6ef9278f53f4afb047ed63d87ba0de68e07d9549b734a73f545f"
+  },
+  "backend": "native.position_replay",
+  "evidence_tier": "execution_aware",
+  "config": {
+    "price_col": "close",
+    "entry_price_col": null,
+    "exit_price_col": null,
+    "transaction_cost_bps": 5.0,
+    "trading_days_per_year": 252,
+    "long_only": true,
+    "preserve_gross_exposure": false,
+    "exit_price_policy": "period",
+    "exit_fallback_policy": "none",
+    "tradable_col": null
+  },
+  "execution": {
+    "ledger": true,
+    "allow_stale_execution_price": false,
+    "intraday_execution_assumption": null,
+    "ledger_config": {
+      "enabled": true,
+      "portfolio_value": 100000.0,
+      "participation_rate": 1.0,
+      "liquidity_cols": [
+        "amount"
+      ],
+      "liquidity_notional_multiplier": 1.0,
+      "buy_max_days": 5,
+      "sell_max_days": 10,
+      "zero_fill_abort_days_buy": 5,
+      "unfilled_buy_action": "keep_cash",
+      "unfilled_sell_action": "keep_position",
+      "round_lot": null,
+      "enforce_t1": false,
+      "enforce_price_limits": false,
+      "enforce_listing_status": false,
+      "limit_up_col": null,
+      "limit_down_col": null,
+      "listing_status_col": null,
+      "lot_tolerance": 1e-06
+    }
+  },
+  "budgets": {
+    "wall_seconds": 60,
+    "memory_mb": 8192
+  },
+  "research_clock": {
+    "schema_version": "research.clock.v1",
+    "timezone": "Asia/Shanghai",
+    "information_cutoff_at": "2026-01-02T15:00:00+08:00",
+    "signal_at": "2026-01-02T15:01:00+08:00",
+    "decision_at": "2026-01-02T15:02:00+08:00",
+    "earliest_order_at": "2026-01-05T09:15:00+08:00",
+    "execution_window_start_at": "2026-01-05T09:30:00+08:00",
+    "execution_window_end_at": "2026-01-06T10:00:00+08:00",
+    "valuation_at": "2026-01-06T15:00:00+08:00",
+    "timing_policy_id": "a-share.close-next-open.v1",
+    "trading_calendar_ref": "sse-szse-202601"
+  },
+  "producer": {
+    "repository": "quant-backtest-runtime",
+    "version": "0.1.0",
+    "commit": "0000000000000000000000000000000000000000",
+    "backend": "native.position_replay"
+  }
+}
