@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=84", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quant-backtest-runtime"
+version = "0.1.0"
+description = "Independent durable backtest job runtime"
+requires-python = ">=3.12"
+dependencies = ["quant-platform>=0.0.1"]
+
+[project.scripts]
+backtest-job = "backtest_runtime.cli:main"
+backtest-worker = "backtest_runtime.worker:main"
+
+[dependency-groups]
+dev = ["pytest>=9", "ruff>=0.8"]
+
+[tool.uv.sources]
+quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "3ede35924d124ebdb2ada89bbcd23d3f9ced82b9" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
