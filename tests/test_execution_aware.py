@@ -17,7 +17,10 @@ from test_jobs import _request
 from backtest_runtime.jobs import BacktestJobRequest, BacktestJobService
 from backtest_runtime.results import read_job_result
 from backtest_runtime.store import JobStore
-from backtest_runtime.worker import _validate_ledger_clock_dates
+from backtest_runtime.worker import (
+    _validate_input_clock_dates,
+    _validate_ledger_clock_dates,
+)
 
 
 def _put_frame(root: Path, frame: pd.DataFrame) -> str:
@@ -104,6 +107,31 @@ def test_v2_rejects_incomplete_clock_before_submit(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="execution_window_end_at"):
         BacktestJobRequest.from_mapping(mapping)
     assert not (tmp_path / "jobs.sqlite").exists()
+
+
+def test_v2_input_clock_rejects_future_signal_and_quote_dates(tmp_path: Path) -> None:
+    clock = _request_v2(tmp_path / "artifacts")["research_clock"]
+    frames = {
+        "positions_ref": pd.DataFrame(
+            {"rebalance_date": ["20260102"], "entry_date": ["20260105"]}
+        ),
+        "periods_ref": pd.DataFrame(
+            {
+                "rebalance_date": ["20260102"],
+                "entry_date": ["20260105"],
+                "exit_date": ["20260106"],
+            }
+        ),
+        "pricing_ref": pd.DataFrame({"trade_date": ["20260105", "20260106"]}),
+    }
+    _validate_input_clock_dates(frames, clock)
+    frames["positions_ref"].loc[0, "rebalance_date"] = "20260105"
+    with pytest.raises(ValueError, match="decision cutoff"):
+        _validate_input_clock_dates(frames, clock)
+    frames["positions_ref"].loc[0, "rebalance_date"] = "20260102"
+    frames["pricing_ref"].loc[1, "trade_date"] = "20260107"
+    with pytest.raises(ValueError, match="future dates"):
+        _validate_input_clock_dates(frames, clock)
 
 
 def test_zero_trade_nav_cannot_be_assigned_to_future_clock(tmp_path: Path) -> None:
@@ -294,7 +322,7 @@ def test_v2_rejects_clock_window_unrelated_to_execution_dates(tmp_path: Path) ->
         ).get_status(receipt.job_id)
         assert status.status == "FAILED"
         assert status.error_code == "BACKTEST_REJECTED"
-        assert "outside the research clock window" in (status.error_message or "")
+        assert "decision cutoff date" in (status.error_message or "")
         assert not (results / receipt.job_id).exists()
     finally:
         store.close()
