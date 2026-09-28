@@ -55,6 +55,8 @@ def _run_native_backend(
         for name, ref in request.inputs.items()
         if ref is not None
     }
+    if request.schema_version == 2:
+        _validate_input_clock_dates(inputs, request.research_clock or {})
     config = PositionBacktestConfig(**request.config)
     execution_values: dict[str, Any] = dict(request.execution["ledger_config"])
     if isinstance(execution_values.get("liquidity_cols"), list):
@@ -117,6 +119,38 @@ def _frame_dates(frame: Any, column: str) -> list[date]:
                 f"invalid execution ledger {column}: {value_text}"
             ) from error
     return dates
+
+
+def _validate_input_clock_dates(inputs: dict[str, Any], clock: dict[str, Any]) -> None:
+    """A v2 Job represents one decision and its bounded execution window."""
+    cutoff = datetime.fromisoformat(clock["information_cutoff_at"]).date()
+    earliest = datetime.fromisoformat(clock["earliest_order_at"]).date()
+    execution_end = datetime.fromisoformat(clock["execution_window_end_at"]).date()
+    valuation = datetime.fromisoformat(clock["valuation_at"]).date()
+    for frame_name in ("positions_ref", "periods_ref"):
+        frame = inputs[frame_name]
+        if any(day != cutoff for day in _frame_dates(frame, "rebalance_date")):
+            raise ValueError(
+                f"{frame_name} rebalance dates must match the decision cutoff date"
+            )
+        if any(
+            not earliest <= day <= execution_end
+            for day in _frame_dates(frame, "entry_date")
+        ):
+            raise ValueError(
+                f"{frame_name} entry dates fall outside the research clock window"
+            )
+    if any(day > valuation for day in _frame_dates(inputs["periods_ref"], "exit_date")):
+        raise ValueError("period exit dates fall after research clock valuation")
+    if any(
+        day > valuation for day in _frame_dates(inputs["pricing_ref"], "trade_date")
+    ):
+        raise ValueError("pricing contains future dates after research clock valuation")
+    bars = inputs.get("intraday_bars_ref")
+    if bars is not None and any(
+        day > execution_end for day in _frame_dates(bars, "trade_date")
+    ):
+        raise ValueError("intraday bars fall after the research clock execution window")
 
 
 def _validate_ledger_clock_dates(result: Any, clock: dict[str, Any]) -> None:
