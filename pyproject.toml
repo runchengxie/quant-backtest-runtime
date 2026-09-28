@@ -21,6 +21,7 @@ dev = [
     "ruff>=0.8",
     "ty>=0.0.84",
 ]
+docs = ["mkdocs-material>=9.6,<10"]
 
 [tool.uv.sources]
 quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "59c432baf5395f8fdd8cffe2dd7d02276c2526ae" }

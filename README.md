@@ -17,6 +17,8 @@ uv run --locked python scripts/smoke_backtest.py
 
 ## 文档
 
+文档站点由 GitHub Actions 自动构建并发布到 [GitHub Pages](https://runchengxie.github.io/quant-backtest-runtime/)。
+
 - [任务请求与结果](docs/jobs.md)：了解请求格式、任务状态和结果校验
 - [开发指南](docs/development.md)：安装选项、完整检查和测试范围
 - [运维指南](docs/operations.md)：部署、回滚和故障处理

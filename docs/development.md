@@ -15,10 +15,13 @@ uv run --locked coverage combine
 uv run --locked coverage report
 uv run --locked python scripts/smoke_backtest.py
 uv run --locked pip-audit --local
+uv run --locked --group docs mkdocs build --strict
 git diff --check
 ```
 
 CI 在 Linux 的 Python 3.12 和 3.13 环境运行上述静态检查、测试和 CLI 示例。依赖安全审计在 Python 3.13 环境执行。
+
+文档站点由 `.github/workflows/docs.yml` 构建并发布到 GitHub Pages。站点构建使用严格模式，发现失效的内部链接时会失败。
 
 Ruff 检查常见错误、导入顺序、易错写法、过时语法和复杂度，单个函数的圈复杂度上限为 10。ty 检查运行时代码与维护脚本。JSON 动态字段仍有 `Any`，其内容约束由请求校验和测试共同保证。
 
