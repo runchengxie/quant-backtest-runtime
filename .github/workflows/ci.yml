@@ -37,3 +37,5 @@ jobs:
       - name: Dependency audit
         if: matrix.python == '3.13'
         run: uv run --locked pip-audit --local
+      - name: Documentation build
+        run: uv run --locked --group docs mkdocs build --strict

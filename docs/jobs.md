@@ -10,9 +10,9 @@
 | v2 | 带执行账本的回放 | `evidence_tier=execution_aware`、完整研究时钟、生产者身份、开启账本 | `quant.backtest_job_result.v2` |
 | v3 | 多次决策的执行诊断 | `evidence_tier=diagnostic`、每次调仓各自的研究时钟、开启账本 | `ticknet.backtest_job_result.v1` |
 
-v2 同时要求 `execution.ledger=true` 和 `execution.ledger_config.enabled=true`。完整字段见 [v2 请求示例](../examples/request-v2.json)，校验实现见 [contracts.py](../src/backtest_runtime/contracts.py)。不支持的字段会被拒绝，避免拼写错误被默默忽略。
+v2 同时要求 `execution.ledger=true` 和 `execution.ledger_config.enabled=true`。完整字段见仓库中的 [v2 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v2.json)，校验实现见 [contracts.py](https://github.com/runchengxie/quant-backtest-runtime/blob/main/src/backtest_runtime/contracts.py)。不支持的字段会被拒绝，避免拼写错误被默默忽略。
 
-v3 接受 `positions_ref`、`pricing_ref` 和 `decision_clocks_ref`。前两者为 Parquet，时钟输入为不超过 1 MiB 的 JSON 对象，以调仓日期为键；三者均使用 `artifact://sha256/<digest>`。[v3 请求示例](../examples/request-v3.json)中的哈希仅为占位，提交前须写入真实输入文件并替换引用。每个日期须有独立且完整的 `research.clock.v1`，平台后端会核对目标、入场与估值日期。v3 保留诊断证据等级，不把缺少来源可见性证明的历史回放标记为正式执行证据。
+v3 接受 `positions_ref`、`pricing_ref` 和 `decision_clocks_ref`。前两者为 Parquet，时钟输入为不超过 1 MiB 的 JSON 对象，以调仓日期为键；三者均使用 `artifact://sha256/<digest>`。仓库中的 [v3 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v3.json)里的哈希仅为占位，提交前须写入真实输入文件并替换引用。每个日期须有独立且完整的 `research.clock.v1`，平台后端会核对目标、入场与估值日期。v3 保留诊断证据等级，不把缺少来源可见性证明的历史回放标记为正式执行证据。
 
 请求文件必须是普通 JSON 文件，大小不超过 64 KiB。`idempotency_key` 为 1 至 128 个安全 ASCII 字符。同一键和同一请求重复提交返回已有任务，同一键绑定不同内容时会报冲突。修改参数后重跑应使用新键。
 
