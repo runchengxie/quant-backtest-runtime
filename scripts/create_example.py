@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 from importlib.metadata import version
 from pathlib import Path
@@ -15,13 +16,18 @@ import pandas as pd
 def create_example(root: Path) -> Path:
     source = Path(__file__).resolve().parents[1]
     marker = source / ".release-ready"
-    commit = (
-        marker.read_text().strip()
-        if marker.is_file()
-        else subprocess.check_output(
+    if marker.is_file():
+        commit = marker.read_text().strip()
+    elif source.parent.name == "releases" and re.fullmatch(
+        r"[0-9a-f]{40}", source.name
+    ):
+        # Shared production promotion exports a Git archive without .git or
+        # the marker written by this repository's standalone release tool.
+        commit = source.name
+    else:
+        commit = subprocess.check_output(
             ["git", "-C", str(source), "rev-parse", "HEAD"], text=True
         ).strip()
-    )
     request = json.loads((source / "examples/request-v2.json").read_text())
     request["producer"]["commit"] = commit
     request["producer"]["version"] = version("quant-backtest-runtime")
