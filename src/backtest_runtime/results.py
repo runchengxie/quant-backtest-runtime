@@ -37,11 +37,45 @@ def read_job_result(
     schema = payload.get("schema_version")
     if schema == "quant.backtest_job_result.v2":
         _verify_official_bundle(root, payload, job_id, request_sha256)
+    elif schema == "quant.trade_accounting_result.v1":
+        _verify_trade_accounting(root, payload)
     elif schema == "ticknet.backtest_job_result.v1":
         _verify_diagnostic_frames(root, payload)
     else:
         raise ValueError("unsupported Job result schema")
     return payload
+
+
+def _verify_trade_accounting(root: Path, payload: dict[str, Any]) -> None:
+    if payload.get("backend") != "native.trade_accounting":
+        raise ValueError("invalid trade accounting backend")
+    inventory = payload.get("inventory")
+    if not isinstance(inventory, list) or len(inventory) != 1:
+        raise ValueError("invalid trade accounting inventory")
+    item = inventory[0]
+    if not isinstance(item, dict) or item.get("path") != "accounting.parquet":
+        raise ValueError("invalid trade accounting frame path")
+    path = root / "accounting.parquet"
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("trade accounting frame missing or unsafe")
+    if _sha256(path) != item.get("sha256") or path.stat().st_size != item.get(
+        "size_bytes"
+    ):
+        raise ValueError("trade accounting frame checksum mismatch")
+    summary = payload.get("summary")
+    if not isinstance(summary, dict) or set(summary) != {
+        "turnover",
+        "commission",
+        "stamp_tax",
+        "slippage",
+        "total_cost",
+    }:
+        raise ValueError("invalid trade accounting summary")
+    import pandas as pd
+
+    frame = pd.read_parquet(path)
+    if len(frame) != 1 or frame.iloc[0].to_dict() != summary:
+        raise ValueError("trade accounting summary does not match verified frame")
 
 
 def _verify_official_bundle(

@@ -1067,7 +1067,7 @@ docs = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "quant-platform", git = "https://github.com/runchengxie/quant-platform.git?rev=70073b9e3566125f00b74d094b9d5a9f08e51c49" }]
+requires-dist = [{ name = "quant-platform", git = "https://github.com/runchengxie/quant-platform.git?rev=59c432baf5395f8fdd8cffe2dd7d02276c2526ae" }]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1082,7 +1082,7 @@ docs = [{ name = "mkdocs-material", specifier = ">=9.6,<10" }]
 [[package]]
 name = "quant-platform"
 version = "0.0.1"
-source = { git = "https://github.com/runchengxie/quant-platform.git?rev=70073b9e3566125f00b74d094b9d5a9f08e51c49#70073b9e3566125f00b74d094b9d5a9f08e51c49" }
+source = { git = "https://github.com/runchengxie/quant-platform.git?rev=59c432baf5395f8fdd8cffe2dd7d02276c2526ae#59c432baf5395f8fdd8cffe2dd7d02276c2526ae" }
 dependencies = [
     { name = "duckdb" },
     { name = "numpy" },
@@ -1111,7 +1111,7 @@ wheels = [
 [[package]]
 name = "research-contracts"
 version = "0.1.0"
-source = { git = "https://github.com/runchengxie/quant-platform.git?subdirectory=packages%2Fresearch-contracts&rev=70073b9e3566125f00b74d094b9d5a9f08e51c49#70073b9e3566125f00b74d094b9d5a9f08e51c49" }
+source = { git = "https://github.com/runchengxie/quant-platform.git?subdirectory=packages%2Fresearch-contracts&rev=59c432baf5395f8fdd8cffe2dd7d02276c2526ae#59c432baf5395f8fdd8cffe2dd7d02276c2526ae" }
 
 [[package]]
 name = "rich"
