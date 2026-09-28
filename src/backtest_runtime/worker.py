@@ -42,6 +42,8 @@ def _apply_memory_limit(memory_mb: int) -> None:
 def _run_native_backend(
     request: BacktestJobRequest, service: BacktestJobService
 ) -> Any:
+    if request.schema_version == 3:
+        return _run_sequenced_backend(request, service)
     import pandas as pd
     from portfolio_backtester import PositionBacktestConfig
     from portfolio_backtester.backends import (
@@ -78,6 +80,47 @@ def _run_native_backend(
         ledger_config=ExecutionSimConfig(**execution_values),
     )
     result = NativePositionReplayBackend().run(backend_request)
+    result.validate()
+    return result
+
+
+def _run_sequenced_backend(
+    request: BacktestJobRequest, service: BacktestJobService
+) -> Any:
+    import pandas as pd
+    from portfolio_backtester.backends import (
+        SequencedExecutionBackend,
+        SequencedExecutionRequest,
+    )
+    from portfolio_backtester.execution_sim import ExecutionSimConfig
+
+    inputs = request.inputs
+
+    def resolve(name: str) -> Path:
+        reference = inputs[name]
+        if reference is None:
+            raise ValueError(f"{name} must be an artifact reference")
+        return service.resolve_artifact(reference)
+
+    positions = pd.read_parquet(resolve("positions_ref"))
+    pricing = pd.read_parquet(resolve("pricing_ref"))
+    clocks_path = resolve("decision_clocks_ref")
+    if clocks_path.stat().st_size > 1024 * 1024:
+        raise ValueError("decision clocks artifact exceeds 1 MiB")
+    clocks = json.loads(clocks_path.read_text(encoding="utf-8"))
+    if not isinstance(clocks, dict) or not clocks:
+        raise ValueError("decision clocks must be a nonempty JSON object")
+    ledger_values = dict(request.execution["ledger_config"])
+    ledger_values["liquidity_cols"] = tuple(ledger_values["liquidity_cols"])
+    result = SequencedExecutionBackend().run(
+        SequencedExecutionRequest(
+            positions=positions,
+            pricing=pricing,
+            decision_clocks=clocks,
+            config=ExecutionSimConfig(**ledger_values),
+            **request.config,
+        )
+    )
     result.validate()
     return result
 

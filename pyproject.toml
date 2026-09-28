@@ -23,7 +23,7 @@ dev = [
 ]
 
 [tool.uv.sources]
-quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "1330a2edb2e1c96daf072ad269b3e1afa78b18ed" }
+quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "70073b9e3566125f00b74d094b9d5a9f08e51c49" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
