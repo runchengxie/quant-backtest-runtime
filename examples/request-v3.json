@@ -1,0 +1,50 @@
+{
+  "schema_version": 3,
+  "idempotency_key": "synthetic-sequenced-v3",
+  "inputs": {
+    "positions_ref": "artifact://sha256/5dbeff0b5589f1791afebd0d75cb94051a491a35b97818847c73693d14e66ebc",
+    "pricing_ref": "artifact://sha256/5680d67d2c05dcd253c83373645b0ec458f82b6500dda4fa61f5dad0777ca0b4",
+    "decision_clocks_ref": "artifact://sha256/0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "backend": "native.sequenced_execution",
+  "evidence_tier": "diagnostic",
+  "config": {
+    "price_col": "close",
+    "tradable_col": null,
+    "buy_tradable_col": null,
+    "sell_tradable_col": null,
+    "limit_up_col": null,
+    "limit_down_col": null,
+    "listing_status_col": null,
+    "transaction_cost_bps": 5.0,
+    "price_basis": "close"
+  },
+  "execution": {
+    "ledger_config": {
+      "enabled": true,
+      "portfolio_value": 100000.0,
+      "participation_rate": 1.0,
+      "liquidity_cols": [
+        "amount"
+      ],
+      "liquidity_notional_multiplier": 1.0,
+      "buy_max_days": 5,
+      "sell_max_days": 10,
+      "zero_fill_abort_days_buy": 5,
+      "unfilled_buy_action": "keep_cash",
+      "unfilled_sell_action": "keep_position",
+      "round_lot": null,
+      "enforce_t1": false,
+      "enforce_price_limits": false,
+      "enforce_listing_status": false,
+      "limit_up_col": null,
+      "limit_down_col": null,
+      "listing_status_col": null,
+      "lot_tolerance": 1e-06
+    }
+  },
+  "budgets": {
+    "wall_seconds": 60,
+    "memory_mb": 8192
+  }
+}

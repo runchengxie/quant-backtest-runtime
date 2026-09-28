@@ -51,6 +51,17 @@ _LEDGER_CONFIG_KEYS = {
     "listing_status_col",
     "lot_tolerance",
 }
+_SEQUENCED_CONFIG_KEYS = {
+    "price_col",
+    "tradable_col",
+    "buy_tradable_col",
+    "sell_tradable_col",
+    "limit_up_col",
+    "limit_down_col",
+    "listing_status_col",
+    "transaction_cost_bps",
+    "price_basis",
+}
 
 
 def _canonical_json(value: Any) -> str:
@@ -91,20 +102,31 @@ def artifact_digest(value: Any, *, label: str) -> str:
 
 def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
     version = mapping["schema_version"]
-    if type(version) is not int or version not in {1, 2}:
-        raise ValueError("schema_version must be integer 1 or 2")
+    if type(version) is not int or version not in {1, 2, 3}:
+        raise ValueError("schema_version must be integer 1, 2 or 3")
     key = mapping["idempotency_key"]
     if not isinstance(key, str) or not _IDEMPOTENCY_KEY.fullmatch(key):
         raise ValueError("idempotency_key must be 1-128 safe ASCII characters")
-    if mapping["backend"] != "native.position_replay":
-        raise ValueError("backend must be native.position_replay in v1")
+    backend = "native.sequenced_execution" if version == 3 else "native.position_replay"
+    if mapping["backend"] != backend:
+        raise ValueError(f"backend must be {backend} in v{version}")
     evidence_tier = mapping["evidence_tier"]
-    if evidence_tier != ("diagnostic" if version == 1 else "execution_aware"):
+    if evidence_tier != ("execution_aware" if version == 2 else "diagnostic"):
         raise ValueError("unsupported evidence_tier")
     return key, evidence_tier
 
 
-def _validate_inputs(value: Any) -> dict[str, str]:
+def _validate_inputs(value: Any, *, version: int) -> dict[str, str]:
+    if version == 3:
+        expected = {"positions_ref", "pricing_ref", "decision_clocks_ref"}
+        if not isinstance(value, dict) or set(value) != expected:
+            raise ValueError(
+                "sequenced inputs must contain positions_ref, pricing_ref and decision_clocks_ref"
+            )
+        return {
+            name: f"artifact://sha256/{artifact_digest(ref, label=name)}"
+            for name, ref in value.items()
+        }
     if not isinstance(value, dict) or set(value) not in (
         {"positions_ref", "pricing_ref", "periods_ref"},
         {"positions_ref", "pricing_ref", "periods_ref", "intraday_bars_ref"},
@@ -310,6 +332,35 @@ def _validate_budgets(value: Any) -> dict[str, int]:
     return dict(budgets)
 
 
+def _validate_sequenced_config(
+    mapping: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    config = _exact_keys(mapping["config"], _SEQUENCED_CONFIG_KEYS, label="config")
+    _require_string_fields(config, ("price_col",), label="config")
+    for name in _SEQUENCED_CONFIG_KEYS - {"price_col", "transaction_cost_bps"}:
+        value = config[name]
+        if value is not None and (
+            not isinstance(value, str) or not value.strip() or len(value) > 128
+        ):
+            raise ValueError(f"config.{name} must be a non-empty string or null")
+    cost = config["transaction_cost_bps"]
+    if (
+        isinstance(cost, bool)
+        or not isinstance(cost, (int, float))
+        or not isfinite(cost)
+        or cost < 0
+    ):
+        raise ValueError("config.transaction_cost_bps must be non-negative and finite")
+    execution = _exact_keys(mapping["execution"], {"ledger_config"}, label="execution")
+    ledger = _exact_keys(
+        execution["ledger_config"], _LEDGER_CONFIG_KEYS, label="execution.ledger_config"
+    )
+    _validate_ledger_config(ledger)
+    if not ledger["enabled"]:
+        raise ValueError("sequenced execution requires an enabled ledger")
+    return dict(config), {"ledger_config": dict(ledger)}
+
+
 @dataclass(frozen=True, slots=True)
 class BacktestJobRequest:
     """Validated, versioned immutable request stored in the job ledger."""
@@ -364,8 +415,12 @@ class BacktestJobRequest:
             expected |= {"research_clock", "producer"}
         mapping = _exact_keys(value, expected, label="request")
         key, evidence_tier = _validate_request_identity(mapping)
-        inputs = _validate_inputs(mapping["inputs"])
-        config, execution = _validate_configs(mapping)
+        inputs = _validate_inputs(mapping["inputs"], version=version)
+        config, execution = (
+            _validate_sequenced_config(mapping)
+            if version == 3
+            else _validate_configs(mapping)
+        )
         budgets = _validate_budgets(mapping["budgets"])
         if version == 2:
             from research_contracts import ProducerIdentity, validate_research_clock
@@ -386,7 +441,7 @@ class BacktestJobRequest:
             "schema_version": version,
             "idempotency_key": key,
             "inputs": inputs,
-            "backend": "native.position_replay",
+            "backend": mapping["backend"],
             "evidence_tier": evidence_tier,
             "config": config,
             "execution": execution,
@@ -403,7 +458,7 @@ class BacktestJobRequest:
         return cls(
             schema_version=version,
             idempotency_key=key,
-            backend="native.position_replay",
+            backend=mapping["backend"],
             evidence_tier=evidence_tier,
             request_sha256=digest,
             _request_json=request_json,
