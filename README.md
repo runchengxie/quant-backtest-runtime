@@ -17,14 +17,7 @@ uv run --locked python scripts/smoke_backtest.py
 
 ## 文档
 
-本地预览 MkDocs 站点：
-
-```bash
-uv sync --locked --group docs --python 3.13
-uv run --locked --group docs mkdocs serve
-```
-
-站点构建检查：`uv run --locked --group docs mkdocs build --strict`。
+文档站点由 GitHub Actions 自动构建并发布到 [GitHub Pages](https://runchengxie.github.io/quant-backtest-runtime/)。
 
 - [任务请求与结果](docs/jobs.md)：了解请求格式、任务状态和结果校验
 - [开发指南](docs/development.md)：安装选项、完整检查和测试范围
