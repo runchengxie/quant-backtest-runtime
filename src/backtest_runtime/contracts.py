@@ -62,6 +62,7 @@ _SEQUENCED_CONFIG_KEYS = {
     "transaction_cost_bps",
     "price_basis",
 }
+_ACCOUNTING_CONFIG_KEYS = {"commission_rate", "stamp_tax_rate", "slippage_rate"}
 
 
 def _canonical_json(value: Any) -> str:
@@ -102,12 +103,15 @@ def artifact_digest(value: Any, *, label: str) -> str:
 
 def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
     version = mapping["schema_version"]
-    if type(version) is not int or version not in {1, 2, 3}:
-        raise ValueError("schema_version must be integer 1, 2 or 3")
+    if type(version) is not int or version not in {1, 2, 3, 4}:
+        raise ValueError("schema_version must be integer 1, 2, 3 or 4")
     key = mapping["idempotency_key"]
     if not isinstance(key, str) or not _IDEMPOTENCY_KEY.fullmatch(key):
         raise ValueError("idempotency_key must be 1-128 safe ASCII characters")
-    backend = "native.sequenced_execution" if version == 3 else "native.position_replay"
+    backend = {
+        3: "native.sequenced_execution",
+        4: "native.trade_accounting",
+    }.get(version, "native.position_replay")
     if mapping["backend"] != backend:
         raise ValueError(f"backend must be {backend} in v{version}")
     evidence_tier = mapping["evidence_tier"]
@@ -117,6 +121,12 @@ def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
 
 
 def _validate_inputs(value: Any, *, version: int) -> dict[str, str]:
+    if version == 4:
+        if not isinstance(value, dict) or set(value) != {"accounting_ref"}:
+            raise ValueError("trade accounting inputs must contain accounting_ref")
+        return {
+            "accounting_ref": f"artifact://sha256/{artifact_digest(value['accounting_ref'], label='accounting_ref')}"
+        }
     if version == 3:
         expected = {"positions_ref", "pricing_ref", "decision_clocks_ref"}
         if not isinstance(value, dict) or set(value) != expected:
@@ -361,6 +371,32 @@ def _validate_sequenced_config(
     return dict(config), {"ledger_config": dict(ledger)}
 
 
+def _validate_accounting_config(
+    mapping: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, Any]]:
+    config = _exact_keys(mapping["config"], _ACCOUNTING_CONFIG_KEYS, label="config")
+    for name, value in config.items():
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+            or value < 0
+        ):
+            raise ValueError(f"config.{name} must be non-negative and finite")
+    execution = _exact_keys(mapping["execution"], set(), label="execution")
+    return {name: float(value) for name, value in config.items()}, execution
+
+
+def _validate_backend_config(
+    mapping: dict[str, Any], version: int
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if version == 3:
+        return _validate_sequenced_config(mapping)
+    if version == 4:
+        return _validate_accounting_config(mapping)
+    return _validate_configs(mapping)
+
+
 @dataclass(frozen=True, slots=True)
 class BacktestJobRequest:
     """Validated, versioned immutable request stored in the job ledger."""
@@ -416,11 +452,7 @@ class BacktestJobRequest:
         mapping = _exact_keys(value, expected, label="request")
         key, evidence_tier = _validate_request_identity(mapping)
         inputs = _validate_inputs(mapping["inputs"], version=version)
-        config, execution = (
-            _validate_sequenced_config(mapping)
-            if version == 3
-            else _validate_configs(mapping)
-        )
+        config, execution = _validate_backend_config(mapping, version)
         budgets = _validate_budgets(mapping["budgets"])
         if version == 2:
             from research_contracts import ProducerIdentity, validate_research_clock

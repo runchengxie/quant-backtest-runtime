@@ -42,6 +42,8 @@ def _apply_memory_limit(memory_mb: int) -> None:
 def _run_native_backend(
     request: BacktestJobRequest, service: BacktestJobService
 ) -> Any:
+    if request.schema_version == 4:
+        return _run_trade_accounting_backend(request, service)
     if request.schema_version == 3:
         return _run_sequenced_backend(request, service)
     import pandas as pd
@@ -82,6 +84,35 @@ def _run_native_backend(
     result = NativePositionReplayBackend().run(backend_request)
     result.validate()
     return result
+
+
+def _run_trade_accounting_backend(
+    request: BacktestJobRequest, service: BacktestJobService
+) -> Any:
+    import pandas as pd
+    from portfolio_backtester.backends.trade_accounting import (
+        TradeCostConfig,
+        compute_trade_accounting_frame,
+    )
+
+    reference = request.inputs["accounting_ref"]
+    if reference is None:
+        raise ValueError("accounting_ref must be an artifact reference")
+    frame = pd.read_parquet(service.resolve_artifact(reference))
+    accounting = compute_trade_accounting_frame(
+        frame, TradeCostConfig(**request.config)
+    )
+    return pd.DataFrame(
+        [
+            {
+                "turnover": accounting.turnover,
+                "commission": accounting.commission,
+                "stamp_tax": accounting.stamp_tax,
+                "slippage": accounting.slippage,
+                "total_cost": accounting.total_cost,
+            }
+        ]
+    )
 
 
 def _run_sequenced_backend(
@@ -229,7 +260,27 @@ def _write_result(
         raise FileExistsError(f"result directory already exists: {job_id}")
     tmp_dir = Path(tempfile.mkdtemp(prefix=f".{job_id}.tmp-", dir=result_root))
     try:
-        if request.schema_version == 2:
+        if request.schema_version == 4:
+            path = tmp_dir / "accounting.parquet"
+            result.to_parquet(path, index=False)
+            manifest = {
+                "schema_version": "quant.trade_accounting_result.v1",
+                "job_id": job_id,
+                "request_sha256": request.request_sha256,
+                "backend": request.backend,
+                "summary": {
+                    name: float(result.iloc[0][name]) for name in result.columns
+                },
+                "inventory": [
+                    {
+                        "path": "accounting.parquet",
+                        "rows": 1,
+                        "sha256": _sha256_file(path),
+                        "size_bytes": path.stat().st_size,
+                    }
+                ],
+            }
+        elif request.schema_version == 2:
             from portfolio_backtester.backends import (
                 write_execution_aware_result_bundle,
             )

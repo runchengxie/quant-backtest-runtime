@@ -1,0 +1,16 @@
+{
+  "schema_version": 4,
+  "idempotency_key": "synthetic-cost-20260106",
+  "backend": "native.trade_accounting",
+  "evidence_tier": "diagnostic",
+  "inputs": {
+    "accounting_ref": "artifact://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "config": {
+    "commission_rate": 0.001,
+    "stamp_tax_rate": 0.005,
+    "slippage_rate": 0.002
+  },
+  "execution": {},
+  "budgets": {"wall_seconds": 30, "memory_mb": 8192}
+}

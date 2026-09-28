@@ -42,7 +42,7 @@ coverage 同时统计语句和分支，并启用 Python 子进程采集。独立
 | `jobs.py` | 任务服务、取消、租约恢复与输入解析 |
 | `store.py` | SQLite 持久化和带前置状态条件的更新 |
 | `worker.py` | 资源限制、后端调用和结果发布 |
-| `results.py` | v1 与 v2 结果完整性校验 |
+| `results.py` | v1 至 v4 结果完整性校验 |
 | `cli.py` | 命令解析和 worker 启动 |
 
 `jobs.BacktestJobRequest` 保留导入兼容性，新代码可直接从 `contracts` 导入。提交 PR 时说明行为变化、验证命令和结果，跨仓修改附上关联 PR。
