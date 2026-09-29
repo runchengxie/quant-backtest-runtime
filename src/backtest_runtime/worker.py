@@ -252,6 +252,7 @@ def _write_result(
     *,
     job_id: str,
     request: BacktestJobRequest,
+    service: BacktestJobService,
     result_root: Path,
 ) -> tuple[str, str]:
     result_root.mkdir(parents=True, exist_ok=True)
@@ -260,6 +261,12 @@ def _write_result(
         raise FileExistsError(f"result directory already exists: {job_id}")
     tmp_dir = Path(tempfile.mkdtemp(prefix=f".{job_id}.tmp-", dir=result_root))
     try:
+        quant_manifest_path = None
+        quant_manifest = None
+        if request.quant_run_manifest_ref is not None:
+            quant_manifest_path, quant_manifest = service.validate_quant_run_manifest(
+                request
+            )
         if request.schema_version == 4:
             path = tmp_dir / "accounting.parquet"
             result.to_parquet(path, index=False)
@@ -309,6 +316,16 @@ def _write_result(
                     tmp_dir / "bundle" / "manifest.json"
                 ),
             }
+            if quant_manifest_path is not None and quant_manifest is not None:
+                target = tmp_dir / "quant_run_manifest.json"
+                shutil.copyfile(quant_manifest_path, target)
+                manifest.update(
+                    {
+                        "quant_run_manifest_path": target.name,
+                        "quant_run_manifest_sha256": _sha256_file(target),
+                        "quant_run_manifest_run_id": quant_manifest.run_id,
+                    }
+                )
         else:
             manifest = _manifest_for_result(
                 result, job_id=job_id, request_sha256=request.request_sha256
@@ -456,6 +473,7 @@ def _publish_job_result(
         result,
         job_id=job_id,
         request=request,
+        service=service,
         result_root=result_root,
     )
     try:

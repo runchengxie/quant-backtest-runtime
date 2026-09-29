@@ -432,8 +432,12 @@ class BacktestJobRequest:
     def producer(self) -> dict[str, Any] | None:
         return self.to_mapping().get("producer")
 
+    @property
+    def quant_run_manifest_ref(self) -> str | None:
+        return self.to_mapping().get("quant_run_manifest_ref")
+
     @classmethod
-    def from_mapping(cls, value: Any) -> BacktestJobRequest:
+    def from_mapping(cls, value: Any) -> BacktestJobRequest:  # noqa: C901
         expected = {
             "schema_version",
             "idempotency_key",
@@ -449,11 +453,16 @@ class BacktestJobRequest:
         version = value.get("schema_version")
         if type(version) is int and version == 2:
             expected |= {"research_clock", "producer"}
+        if "quant_run_manifest_ref" in value:
+            expected.add("quant_run_manifest_ref")
         mapping = _exact_keys(value, expected, label="request")
         key, evidence_tier = _validate_request_identity(mapping)
         inputs = _validate_inputs(mapping["inputs"], version=version)
         config, execution = _validate_backend_config(mapping, version)
         budgets = _validate_budgets(mapping["budgets"])
+        manifest_ref = None
+        if "quant_run_manifest_ref" in mapping:
+            manifest_ref = f"artifact://sha256/{artifact_digest(mapping['quant_run_manifest_ref'], label='quant_run_manifest_ref')}"
         if version == 2:
             from research_contracts import ProducerIdentity, validate_research_clock
 
@@ -482,6 +491,8 @@ class BacktestJobRequest:
         if version == 2:
             normalized["research_clock"] = clock
             normalized["producer"] = producer
+        if manifest_ref is not None:
+            normalized["quant_run_manifest_ref"] = manifest_ref
         request_json = _canonical_json(normalized)
         request_bytes = request_json.encode("utf-8")
         if len(request_bytes) > 64 * 1024:

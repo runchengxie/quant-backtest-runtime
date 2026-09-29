@@ -37,6 +37,7 @@ def read_job_result(
     schema = payload.get("schema_version")
     if schema == "quant.backtest_job_result.v2":
         _verify_official_bundle(root, payload, job_id, request_sha256)
+        _verify_quant_run_manifest(root, payload)
     elif schema == "quant.trade_accounting_result.v1":
         _verify_trade_accounting(root, payload)
     elif schema == "ticknet.backtest_job_result.v1":
@@ -95,6 +96,34 @@ def _verify_official_bundle(
         raise ValueError("official bundle identity mismatch")
     if official.artifact_envelope.get("configuration_sha256") != request_sha256:
         raise ValueError("official bundle request fingerprint mismatch")
+
+
+def _verify_quant_run_manifest(root: Path, payload: dict[str, Any]) -> None:
+    path_name = payload.get("quant_run_manifest_path")
+    digest = payload.get("quant_run_manifest_sha256")
+    if path_name is None and digest is None:
+        return
+    if path_name != "quant_run_manifest.json" or not isinstance(digest, str):
+        raise ValueError("invalid quant run manifest reference")
+    path = root / path_name
+    if path.is_symlink() or not path.is_file() or _sha256(path) != digest:
+        raise ValueError("quant run manifest checksum mismatch")
+    from research_contracts import QuantRunManifest
+
+    try:
+        manifest = QuantRunManifest.from_mapping(
+            json.loads(path.read_text(encoding="utf-8"))
+        )
+    except (
+        OSError,
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise ValueError("invalid quant run manifest") from error
+    if manifest.run_id != payload.get("quant_run_manifest_run_id"):
+        raise ValueError("quant run manifest identity mismatch")
 
 
 def _verify_diagnostic_frames(root: Path, payload: dict[str, Any]) -> None:

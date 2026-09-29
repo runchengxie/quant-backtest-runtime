@@ -89,6 +89,7 @@ def test_cli_worker_start_failure_is_persisted(tmp_path, monkeypatch):
     store = JobStore(tmp_path / "jobs.sqlite")
     try:
         row = store.get_backtest_job_by_key("official-bundle")
+        assert row is not None
         assert row["status"] == "FAILED"
         assert row["error_code"] == "WORKER_START_FAILED"
     finally:

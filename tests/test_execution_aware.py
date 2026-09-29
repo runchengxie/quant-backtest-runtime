@@ -12,6 +12,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 import pytest
+from research_contracts import build_quant_run_manifest
 from test_jobs import _request
 
 from backtest_runtime.jobs import BacktestJobRequest, BacktestJobService
@@ -32,6 +33,42 @@ def _put_frame(root: Path, frame: pd.DataFrame) -> str:
     target.parent.mkdir(exist_ok=True)
     temporary.replace(target)
     return f"artifact://sha256/{digest}"
+
+
+def _put_bytes(root: Path, name: str, content: bytes) -> str:
+    source = root / name
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(content)
+    digest = sha256(content).hexdigest()
+    target = root / "sha256" / digest
+    target.parent.mkdir(exist_ok=True)
+    target.write_bytes(content)
+    return f"artifact://sha256/{digest}"
+
+
+def _put_quant_run_manifest(root: Path, clock: dict[str, str]) -> str:
+    source = root / "manifest-source"
+    (source / "backtest_bundle").mkdir(parents=True)
+    (source / "backtest_bundle" / "manifest.json").write_text("{}\n")
+    (source / "config.used.yml").write_text("seed: 1\n")
+    (source / "execution.json").write_bytes(b'{"execution": true}\n')
+    manifest_path = build_quant_run_manifest(
+        source,
+        run_id="research-run-1",
+        strategy_ref="strategy:synthetic-v1",
+        research_purpose="runtime consumer test",
+        evidence_tier="diagnostic",
+        clock=clock,
+        producer_versions=[{"repository": "quant-backtest-runtime", "commit": "test"}],
+        data_refs=[],
+        signal_refs=[],
+        component_refs={
+            "execution": {"path": "execution.json", "artifact_id": "execution"}
+        },
+    )
+    _put_bytes(root, "quant-run.manifest.json", manifest_path.read_bytes())
+    _put_bytes(root, "execution-copy.json", (source / "execution.json").read_bytes())
+    return f"artifact://sha256/{sha256(manifest_path.read_bytes()).hexdigest()}"
 
 
 def _request_v2(root: Path) -> dict:
@@ -217,6 +254,75 @@ def test_v2_worker_publishes_and_verifies_official_bundle(tmp_path: Path) -> Non
             )
     finally:
         store.close()
+
+
+def test_v2_worker_consumes_and_publishes_quant_run_manifest(tmp_path: Path) -> None:
+    artifacts = tmp_path / "artifacts"
+    mapping = _request_v2(artifacts)
+    mapping["quant_run_manifest_ref"] = _put_quant_run_manifest(
+        artifacts, mapping["research_clock"]
+    )
+    request = BacktestJobRequest.from_mapping(mapping)
+    database = tmp_path / "jobs.sqlite"
+    results = tmp_path / "results"
+    store = JobStore(database)
+    service = BacktestJobService(store, artifact_root=artifacts, result_root=results)
+    receipt = service.submit(request)
+    store.close()
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "backtest_runtime.worker",
+            "--job-id",
+            receipt.job_id,
+            "--registry",
+            str(database),
+            "--artifact-root",
+            str(artifacts),
+            "--result-root",
+            str(results),
+        ],
+        capture_output=True,
+        check=False,
+        timeout=45,
+        env=os.environ.copy(),
+    )
+    assert completed.returncode == 0, completed.stderr.decode(errors="replace")
+    store = JobStore(database)
+    try:
+        status = BacktestJobService(
+            store, artifact_root=artifacts, result_root=results
+        ).get_status(receipt.job_id)
+        manifest = read_job_result(
+            results,
+            job_id=receipt.job_id,
+            manifest_sha256=status.result_sha256 or "",
+            request_sha256=request.request_sha256,
+        )
+        assert manifest["quant_run_manifest_run_id"] == "research-run-1"
+        assert (results / receipt.job_id / "quant_run_manifest.json").is_file()
+    finally:
+        store.close()
+
+
+def test_quant_run_manifest_component_refs_must_be_available(tmp_path: Path) -> None:
+    artifacts = tmp_path / "artifacts"
+    mapping = _request_v2(artifacts)
+    manifest_ref = _put_quant_run_manifest(artifacts, mapping["research_clock"])
+    component = artifacts / "sha256"
+    for path in component.iterdir():
+        if path.is_file() and path.read_bytes() == b'{"execution": true}\n':
+            path.unlink()
+    mapping["quant_run_manifest_ref"] = manifest_ref
+    request = BacktestJobRequest.from_mapping(mapping)
+    service = BacktestJobService(
+        JobStore(tmp_path / "jobs.sqlite"),
+        artifact_root=artifacts,
+        result_root=tmp_path / "results",
+    )
+    with pytest.raises(FileNotFoundError, match="Immutable input artifact"):
+        service.submit(request)
 
 
 def test_v1_diagnostic_worker_retains_historical_schema(tmp_path: Path) -> None:

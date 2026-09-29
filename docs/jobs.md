@@ -11,7 +11,7 @@
 | v3 | 多次决策的执行诊断 | `evidence_tier=diagnostic`、每次调仓各自的研究时钟、开启账本 | `ticknet.backtest_job_result.v1` |
 | v4 | 单次权重调整的交易成本结算 | `evidence_tier=diagnostic`、内容哈希输入、非负有限费率 | `quant.trade_accounting_result.v1` |
 
-v2 同时要求 `execution.ledger=true` 和 `execution.ledger_config.enabled=true`。完整字段见仓库中的 [v2 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v2.json)，校验实现见 [contracts.py](https://github.com/runchengxie/quant-backtest-runtime/blob/main/src/backtest_runtime/contracts.py)。不支持的字段会被拒绝，避免拼写错误被默默忽略。
+v2 同时要求 `execution.ledger=true` 和 `execution.ledger_config.enabled=true`。生产请求可以提供 `quant_run_manifest_ref`，指向同一 artifact store 中的 typed `QuantRunManifest`。提交和 worker 会校验 manifest 及其 `component_refs` 的内容哈希；成功结果会原样保存已校验的根 manifest，供下游复核。完整字段见仓库中的 [v2 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v2.json)，校验实现见 [contracts.py](https://github.com/runchengxie/quant-backtest-runtime/blob/main/src/backtest_runtime/contracts.py)。不支持的字段会被拒绝，避免拼写错误被默默忽略。
 
 v3 接受 `positions_ref`、`pricing_ref` 和 `decision_clocks_ref`。前两者为 Parquet，时钟输入为不超过 1 MiB 的 JSON 对象，以调仓日期为键；三者均使用 `artifact://sha256/<digest>`。仓库中的 [v3 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v3.json)里的哈希仅为占位，提交前须写入真实输入文件并替换引用。每个日期须有独立且完整的 `research.clock.v1`，平台后端会核对目标、入场与估值日期。v3 保留诊断证据等级，不把缺少来源可见性证明的历史回放标记为正式执行证据。
 
@@ -62,4 +62,4 @@ flowchart LR
 
 v1 和 v3 结果包含五张诊断表。v2 结果包含平台的 `portfolio_backtester.backtest_result.v1` 标准结果包。v4 结果包含单行成本表。`result` 会校验任务身份、请求指纹、清单哈希和结果文件哈希，再返回元数据。发现文件被修改时会报错。
 
-回测任务成功表示结果已完成发布。研究晋升还需要调用方关联独立的根 `ResearchRunManifest`，并完成研究侧的来源核对和审批。
+回测任务成功表示结果已完成发布。若请求提供 `quant_run_manifest_ref`，结果清单会包含 `quant_run_manifest.json` 及其 SHA-256，并验证其 typed `QuantRunManifest` 和组件引用。研究晋升仍需要研究侧完成来源核对和人工审批；运行时不会自动晋升策略。
