@@ -1,5 +1,5 @@
 site_name: quant-backtest-runtime
-site_description: 回测任务运行时的使用、开发与运维文档
+site_description: Backtest job runtime usage, development, and operations documentation
 site_url: https://runchengxie.github.io/quant-backtest-runtime/
 repo_name: runchengxie/quant-backtest-runtime
 repo_url: https://github.com/runchengxie/quant-backtest-runtime
@@ -7,7 +7,7 @@ edit_uri: edit/main/docs/
 
 theme:
   name: material
-  language: zh
+  language: en
   font: false
   features:
     - navigation.sections
@@ -50,8 +50,8 @@ plugins:
   - search
 
 nav:
-  - 概览: index.md
-  - 回测任务与结果: jobs.md
-  - 开发与检查: development.md
-  - 发布与故障排查: operations.md
-  - 仓库职责: ownership.md
+  - Overview: index.md
+  - Backtest jobs and results: jobs.md
+  - Development and checks: development.md
+  - Operations and troubleshooting: operations.md
+  - Repository ownership: ownership.md

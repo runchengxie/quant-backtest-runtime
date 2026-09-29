@@ -1,17 +1,19 @@
-# 仓库职责与迁移
+# Repository ownership and migration
 
-从研究仓库拆出运行时后，通用任务操作的使用说明、示例和运维脚本统一在本仓库维护。
+[中文页面](ownership.zh-CN.md)
 
-| 内容 | 维护位置 |
+After the runtime was split from the research repository, generic task-operation instructions, examples, and operations scripts are maintained here.
+
+| Content | Maintained by |
 | --- | --- |
-| 任务请求、SQLite 状态、worker、取消和恢复 | `quant-backtest-runtime` |
-| 通用 CLI 示例、合成数据检查、发布和回滚 | 本仓库的 `scripts/`、`examples/` 和 `docs/` |
-| 策略输入准备、研究客户端、来源记录与晋升 | `quant-research` |
-| 旧研究任务库的只读适配与切换前检查 | `quant-research` |
-| 回测算法、执行模拟和标准结果包 | `quant-platform` |
+| Job requests, SQLite state, worker, cancellation, and recovery | `quant-backtest-runtime` |
+| Generic CLI examples, synthetic checks, release, and rollback | This repository's `scripts/`, `examples/`, and `docs/` |
+| Strategy inputs, research clients, provenance, and promotion | `quant-research` |
+| Read-only adapters for legacy research jobs | `quant-research` |
+| Backtest algorithms, execution simulation, and standard result packages | `quant-platform` |
 
-研究侧的 `scripts/dev/check_legacy_backtest_jobs.py` 专门检查旧 `ExperimentRegistry` 是否还有未结束的任务，随历史适配保留在研究仓库。旧任务全部迁移或退役且无人使用 `--legacy` 后，可由研究仓库移除这一适配。
+The research-side `scripts/dev/check_legacy_backtest_jobs.py` checks whether the legacy `ExperimentRegistry` still has unfinished jobs. It remains in the research repository while the historical adapter is in use.
 
-平台仓库中的架构设计和实施计划保留为迁移历史，当前运行方法以本仓库文档为准。跨仓调用方通过链接引用说明，避免维护多份任务协议和部署步骤。
+Architecture plans in the platform repository are migration history. Current runtime behavior is documented here. Cross-repository callers should link to these contracts instead of maintaining duplicate task and deployment procedures.
 
-运行时使用 `quant-platform` 的基础依赖集，模型训练、交叉验证和技术指标所需的 XGBoost、scikit-learn、pandas-ta 由平台的 `ml` 可选安装组提供。研究调用方按需声明 `quant-platform[ml]`。本仓库的回测不安装这些包及其专用计算库。
+The runtime uses the base dependency set from `quant-platform`. Model training, cross-validation, and technical indicators are optional platform capabilities and are not installed by this runtime.
