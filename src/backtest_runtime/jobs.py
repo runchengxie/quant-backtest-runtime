@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import select
@@ -78,6 +79,8 @@ class BacktestJobService:
                 "BacktestJobRequest fields do not match the stored fingerprint"
             )
         request = checked_request
+        if request.quant_run_manifest_ref is not None:
+            self.validate_quant_run_manifest(request)
         existing = self.registry.get_backtest_job_by_key(request.idempotency_key)
         if existing is not None:
             if existing["request_sha256"] != request.request_sha256:
@@ -95,6 +98,25 @@ class BacktestJobService:
                 )
             return JobReceipt(existing["job_id"], existing["status"], False)
         return JobReceipt(job_id, "SUBMITTED", True)
+
+    def validate_quant_run_manifest(self, request: BacktestJobRequest) -> Any:
+        """Validate the typed run manifest and every referenced component artifact."""
+        from research_contracts import QuantRunManifest
+
+        reference = request.quant_run_manifest_ref
+        if reference is None:
+            raise ValueError("quant_run_manifest_ref is required")
+        path = self.resolve_artifact(reference)
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("quant run manifest must be valid UTF-8 JSON") from error
+        if not isinstance(payload, dict):
+            raise ValueError("quant run manifest must be a JSON object")
+        manifest = QuantRunManifest.from_mapping(payload)
+        for component in (manifest.component_refs or {}).values():
+            self.resolve_artifact(f"artifact://sha256/{component.sha256}")
+        return path, manifest
 
     def get_status(self, job_id: str) -> JobStatus:
         row = self.registry.get_backtest_job(job_id)
