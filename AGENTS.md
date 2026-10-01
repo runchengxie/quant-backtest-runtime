@@ -1,5 +1,9 @@
 # quant-backtest-runtime 工作规则
 
+## PR review 例外
+
+用户明确授权合并由用户本人编写，或由用户明确委托 agent 完成的 PR 时，可免除单独的人工 review。必需检查仍须通过，冲突必须解决；不得绕过 hooks、分支保护、ruleset 或项目维护者明确规定的不可豁免审查。
+
 本仓库维护通用回测任务协议、SQLite 状态、worker、资源控制、产物校验、CLI 和发布工具。策略、研究来源记录和晋升规则属于 `quant-research`。可复用的回测算法、执行模拟和结果协议属于 `quant-platform`。
 
 ## 开发与交付
