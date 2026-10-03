@@ -1,69 +1,84 @@
 from __future__ import annotations
 
-import subprocess
+import importlib.util
 import sys
-from html.parser import HTMLParser
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 
 
-class _PrimaryNavigationText(HTMLParser):
-    def __init__(self) -> None:
-        super().__init__()
-        self._nav_states: list[bool | None] = []
-        self.text: list[str] = []
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag != "nav":
-            return
-        classes = (dict(attrs).get("class") or "").split()
-        if not self._nav_states:
-            self._nav_states.append("md-nav--primary" in classes)
-        else:
-            parent_is_primary = all(state is True for state in self._nav_states)
-            self._nav_states.append(
-                parent_is_primary and "md-nav--secondary" not in classes
-            )
-
-    def handle_endtag(self, tag: str) -> None:
-        if tag == "nav" and self._nav_states:
-            self._nav_states.pop()
-
-    def handle_data(self, data: str) -> None:
-        if self._nav_states and self._nav_states[-1] is True:
-            self.text.append(data.strip())
+class _Navigation:
+    def __init__(self, items: list[object], pages: list[object]) -> None:
+        self.items = items
+        self.pages = pages
 
 
-def test_rendered_sidebars_follow_the_page_locale(tmp_path: Path) -> None:
+class _PageItem:
+    is_page = True
+    is_section = False
+    is_link = False
+
+    def __init__(self, path: str) -> None:
+        self.file = SimpleNamespace(src_uri=path)
+
+
+class _SectionItem:
+    is_page = False
+    is_section = True
+    is_link = False
+
+    def __init__(self, title: str, children: list[object]) -> None:
+        self.title = title
+        self.children = children
+
+
+def _load_navigation_hook(monkeypatch):
+    mkdocs = ModuleType("mkdocs")
+    mkdocs.__path__ = []
+    structure = ModuleType("mkdocs.structure")
+    structure.__path__ = []
+    nav_module = ModuleType("mkdocs.structure.nav")
+    nav_module.Navigation = _Navigation
+    monkeypatch.setitem(sys.modules, "mkdocs", mkdocs)
+    monkeypatch.setitem(sys.modules, "mkdocs.structure", structure)
+    monkeypatch.setitem(sys.modules, "mkdocs.structure.nav", nav_module)
+
     root = Path(__file__).resolve().parents[1]
-    site_dir = tmp_path / "site"
-    result = subprocess.run(
+    hook_path = root / "project_tools" / "locale_navigation.py"
+    spec = importlib.util.spec_from_file_location("tested_locale_navigation", hook_path)
+    assert spec is not None and spec.loader is not None
+    hook = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(hook)
+    return hook
+
+
+def test_sidebar_and_search_pages_follow_the_current_locale(monkeypatch) -> None:
+    hook = _load_navigation_hook(monkeypatch)
+    english_item = _PageItem("jobs.md")
+    chinese_item = _PageItem("jobs.zh-CN.md")
+    navigation = _Navigation(
         [
-            sys.executable,
-            "-m",
-            "mkdocs",
-            "build",
-            "--strict",
-            "--site-dir",
-            str(site_dir),
+            _SectionItem("English", [english_item]),
+            _SectionItem("简体中文", [chinese_item]),
         ],
-        cwd=root,
-        capture_output=True,
-        check=False,
-        text=True,
+        [english_item, chinese_item],
     )
-    assert result.returncode == 0, result.stdout + result.stderr
 
-    pages = {
-        "English": site_dir / "index.html",
-        "Chinese": site_dir / "index.zh-CN/index.html",
-    }
-    navigation: dict[str, str] = {}
-    for locale, path in pages.items():
-        parser = _PrimaryNavigationText()
-        parser.feed(path.read_text(encoding="utf-8"))
-        navigation[locale] = " ".join(parser.text)
+    english_context = {}
+    hook.on_page_context(
+        english_context,
+        SimpleNamespace(file=SimpleNamespace(src_uri="index.md")),
+        {},
+        navigation,
+    )
+    assert english_context["nav"].items == [english_item]
+    assert english_context["nav"].pages == [english_item]
 
-    assert "Backtest jobs and results" in navigation["English"]
-    assert "回测任务与结果" not in navigation["English"]
-    assert "回测任务与结果" in navigation["Chinese"]
-    assert "Backtest jobs and results" not in navigation["Chinese"]
+    chinese_context = {}
+    hook.on_page_context(
+        chinese_context,
+        SimpleNamespace(file=SimpleNamespace(src_uri="index.zh-CN.md")),
+        {},
+        navigation,
+    )
+    assert chinese_context["nav"].items == [chinese_item]
+    assert chinese_context["nav"].pages == [chinese_item]
