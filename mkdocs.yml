@@ -49,9 +49,19 @@ markdown_extensions:
 plugins:
   - search
 
+hooks:
+  - project_tools/locale_navigation.py
+
 nav:
-  - Overview: index.md
-  - Backtest jobs and results: jobs.md
-  - Development and checks: development.md
-  - Operations and troubleshooting: operations.md
-  - Repository ownership: ownership.md
+  - English:
+      - Overview: index.md
+      - Backtest jobs and results: jobs.md
+      - Development and checks: development.md
+      - Operations and troubleshooting: operations.md
+      - Repository ownership: ownership.md
+  - 简体中文:
+      - 首页: index.zh-CN.md
+      - 回测任务与结果: jobs.zh-CN.md
+      - 开发与检查: development.zh-CN.md
+      - 发布与故障排查: operations.zh-CN.md
+      - 仓库职责与迁移: ownership.zh-CN.md
