@@ -5,14 +5,23 @@ from pathlib import Path
 SITE = Path(__file__).resolve().parents[1] / "site"
 
 
+def page_document(path: str) -> str:
+    return (SITE / path).read_text(encoding="utf-8")
+
+
 def primary_navigation(path: str) -> str:
-    html = (SITE / path).read_text(encoding="utf-8")
+    html = page_document(path)
     return html.split("md-sidebar--primary", 1)[1].split("md-sidebar--secondary", 1)[0]
 
 
 def main() -> None:
+    english_document = page_document("index.html")
+    chinese_document = page_document("index.zh-CN/index.html")
     english = primary_navigation("index.html")
     chinese = primary_navigation("index.zh-CN/index.html")
+
+    assert '<html lang="en"' in english_document
+    assert '<html lang="zh"' in chinese_document
 
     for label in (
         "Backtest jobs and results",
