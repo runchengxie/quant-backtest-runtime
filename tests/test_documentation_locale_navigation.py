@@ -67,18 +67,20 @@ def test_sidebar_and_search_pages_follow_the_current_locale(monkeypatch) -> None
     hook.on_page_context(
         english_context,
         SimpleNamespace(file=SimpleNamespace(src_uri="index.md")),
-        {},
+        SimpleNamespace(theme=SimpleNamespace(language="en")),
         navigation,
     )
     assert english_context["nav"].items == [english_item]
     assert english_context["nav"].pages == [english_item]
+    assert english_context["config"].theme.language == "en"
 
     chinese_context = {}
     hook.on_page_context(
         chinese_context,
         SimpleNamespace(file=SimpleNamespace(src_uri="index.zh-CN.md")),
-        {},
+        SimpleNamespace(theme=SimpleNamespace(language="en")),
         navigation,
     )
     assert chinese_context["nav"].items == [chinese_item]
     assert chinese_context["nav"].pages == [chinese_item]
+    assert chinese_context["config"].theme.language == "zh"

@@ -39,4 +39,9 @@ def on_page_context(context, page, config, nav):
             flattened.append(item)
     pages = [item for item in nav.pages if _is_chinese(item) == chinese]
     context["nav"] = Navigation(flattened, pages)
+    localized_config = copy(config)
+    localized_theme = copy(config.theme)
+    localized_theme.language = "zh" if chinese else "en"
+    localized_config.theme = localized_theme
+    context["config"] = localized_config
     return context
