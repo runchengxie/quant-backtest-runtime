@@ -56,11 +56,11 @@ Production calls use `current/.venv/bin/backtest-job` and pass the three data pa
 | Result hash mismatch | Preserve the file and logs, then regenerate the input or job |
 
 Back up SQLite using its consistency-safe backup method and preserve the input and result directories together. Backup and cleanup scheduling belongs to the deployment environment; this repository does not provide a resident backup service.
-# Publication fault recovery
+
+## Publication fault recovery
 
 Result-directory publication and SQLite success are separate boundaries. A renamed
 directory is not a successful result until the job state commits. Lease expiry
 fails an unfinished job conservatively; it never adopts a directory as success.
 Repeated recovery also retries cleanup for expired failed jobs, including after a
 cleanup interruption. Unrelated directories and processes remain outside cleanup.
-
