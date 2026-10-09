@@ -239,6 +239,8 @@ class BacktestJobService:
             recovered += int(expired)
             if expired:
                 self._remove_unpublished_output(row["job_id"])
+        for job_id in self.registry.list_expired_output_cleanup():
+            self._remove_unpublished_output(job_id)
         return recovered
 
     def _remove_unpublished_output(self, job_id: str) -> None:
