@@ -241,3 +241,12 @@ class JobStore:
         )
         self._connection.commit()
         return cursor.rowcount == 1
+
+    def list_expired_output_cleanup(self) -> list[str]:
+        """Retain cleanup eligibility after a lease expiration state commit."""
+        rows = self._connection.execute(
+            "SELECT job_id FROM backtest_jobs WHERE status='FAILED' "
+            "AND error_code IN ('WORKER_LEASE_EXPIRED','WORKER_START_EXPIRED') "
+            "AND worker_pid IS NULL ORDER BY job_id"
+        ).fetchall()
+        return [row["job_id"] for row in rows]
