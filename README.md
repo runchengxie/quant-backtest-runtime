@@ -1,25 +1,25 @@
 # quant-backtest-runtime
 
-`quant-backtest-runtime` 接收已提交的回测任务，负责校验请求、管理任务状态、运行 worker，并发布结果。这里的 runtime 指回测任务执行环境，不运行 LLM Agent。
+[中文 README](README.zh-CN.md)
 
-本项目属于 Quant Research 项目系列。同系列仓库各自独立维护，通过明确的接口协作：`quant-platform` 提供回测能力，私有 `quant-research` 管理策略研究和证据，本项目负责任务执行。
+`quant-backtest-runtime` accepts submitted backtest jobs, validates requests, manages job state in SQLite, runs workers, and validates and publishes results. It does not run LLM agents.
 
-## 跑通合成示例
+Within the Quant Research project family, [`quant-platform`](https://github.com/runchengxie/quant-platform) provides reusable backtest capabilities, the research layer owns strategies and promotion, and this repository owns generic job execution. See [Repository ownership](docs/ownership.md) for the boundaries.
 
-需要 Linux、Python 3.12 或 3.13，以及 `uv`：
+## Run the synthetic example
+
+Linux, Python 3.12 or 3.13, and `uv` are required:
 
 ```bash
 uv sync --locked --group dev --python 3.13
 uv run --locked python scripts/smoke_backtest.py
 ```
 
-示例使用虚构数据，在临时目录中提交任务并检查结果。
+The example uses synthetic data in a temporary directory. It submits a job and validates the result without requiring private research data.
 
-## 文档
+## Reading order
 
-在线文档：[quant-backtest-runtime 文档](https://runchengxie.github.io/quant-backtest-runtime/)。
-
-- [任务请求与结果](docs/jobs.md)：了解请求格式、任务状态和结果校验
-- [开发指南](docs/development.md)：安装选项、完整检查和测试范围
-- [运维指南](docs/operations.md)：部署、回滚和故障处理
-- [职责说明](docs/ownership.md)：了解本项目与上游、下游的分工
+1. [Backtest jobs and results](docs/jobs.md): request versions, input references, job state, and result validation.
+2. [Development and checks](docs/development.md): local setup, quality gates, and test scope.
+3. [Operations and troubleshooting](docs/operations.md): release directories, rollback, and common failures.
+4. [Repository ownership](docs/ownership.md): interfaces with the research and platform repositories.
