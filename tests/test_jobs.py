@@ -210,3 +210,15 @@ def test_unclaimed_worker_launch_expires_instead_of_staying_submitted(tmp_path) 
         assert service.get_status(receipt.job_id).error_code == "WORKER_START_EXPIRED"
     finally:
         registry.close()
+
+
+@pytest.mark.parametrize("lease", [float("nan"), float("inf"), -float("inf")])
+def test_nonfinite_lease_is_rejected_before_claiming(tmp_path, lease):
+    registry, service = _service(tmp_path)
+    try:
+        receipt = service.submit(BacktestJobRequest.from_mapping(_request()))
+        with pytest.raises(ValueError, match="finite"):
+            service.claim(receipt.job_id, worker_pid=1234, lease_seconds=lease)
+        assert service.get_status(receipt.job_id).status == "SUBMITTED"
+    finally:
+        registry.close()
