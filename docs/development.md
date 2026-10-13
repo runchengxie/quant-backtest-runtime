@@ -19,13 +19,15 @@ uv run --locked --group docs mkdocs build --strict
 git diff --check
 ```
 
-CI runs the static checks, tests, and synthetic CLI example on Linux with Python 3.12 and 3.13. The documentation workflow builds and publishes MkDocs in strict mode, so broken internal links fail the build.
+CI runs the static checks, tests, and synthetic CLI example on Linux with Python 3.12 and 3.13. Dependency auditing runs on Python 3.13. The documentation workflow builds and publishes MkDocs in strict mode, so broken internal links fail the build.
+
+Ruff checks imports, common errors, unsafe exception handling, obsolete syntax, and complexity, with a cyclomatic complexity limit of 10. ty checks runtime code and maintenance scripts. Request validation and tests enforce the content of dynamic JSON fields typed as `Any`.
 
 ## Coverage and test boundaries
 
-Coverage includes statements and branches and combines data from Python subprocesses. The current combined threshold is 75%. Raising it requires additional behavior tests; excluding code or deleting assertions is not an acceptable shortcut.
+Coverage includes statements and branches and combines data from Python subprocesses. The CLI restricts worker environment variables, so some indirectly launched workers do not inherit coverage settings. Direct worker integration tests retain subprocess coverage; forcibly terminated processes may not write coverage data. The current combined threshold is 75%. Raising it requires additional behavior tests; excluding code or deleting assertions is not an acceptable shortcut.
 
-Tests cover request fingerprints and idempotency, competing state updates, cancellation, timeouts, startup failures, lease recovery, result tampering, and v1/v2 subprocess replays. `scripts/smoke_backtest.py` verifies that the installed CLI, independent worker, and synthetic example work together.
+Tests cover request fingerprints and idempotency, competing state updates, cancellation, timeouts, startup failures, lease recovery, result tampering, and v1–v4 subprocess replays, including sequenced execution and trade-accounting result checks. `scripts/smoke_backtest.py` verifies that the installed CLI, independent worker, and synthetic example work together.
 
 ## Dependency audit
 
