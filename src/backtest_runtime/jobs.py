@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import select
@@ -139,8 +140,8 @@ class BacktestJobService:
     ) -> JobStatus | None:
         if type(worker_pid) is not int or worker_pid <= 0:
             raise ValueError("worker_pid must be a positive integer")
-        if lease_seconds <= 0:
-            raise ValueError("lease_seconds must be positive")
+        if not math.isfinite(lease_seconds) or lease_seconds <= 0:
+            raise ValueError("lease_seconds must be finite and positive")
         claimed = self.registry.transition_backtest_job(
             job_id,
             expected="SUBMITTED",
