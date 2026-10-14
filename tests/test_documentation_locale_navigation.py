@@ -4,6 +4,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
+from typing import Any
 
 
 class _Navigation:
@@ -90,7 +91,7 @@ def test_theme_labels_follow_locale_without_changing_palette_or_shared_config(
     monkeypatch,
 ) -> None:
     hook = _load_navigation_hook(monkeypatch)
-    palette = [
+    palette: list[dict[str, Any]] = [
         {
             "scheme": "default",
             "primary": "blue grey",
