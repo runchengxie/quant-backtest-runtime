@@ -46,6 +46,12 @@ stateDiagram-v2
 
 Cancellation first records a request and then signals the worker confirmed to belong to the job. A completed job does not change state because of a repeated cancellation. `recover` handles expired leases; `submit` and `status` also trigger recovery. There is no resident scheduler, so unattended environments should run `recover` periodically.
 
+### Recovery and durability boundary
+
+Recovery tests cover process interruption and a result-directory rename followed by a failed state commit. A published directory alone does not make a job successful; lease recovery removes unpublished output.
+
+Result publication currently does not call `fsync` on result files or their directories. Committing `SUCCEEDED` in SQLite therefore does not establish that result bytes will survive a machine power loss. The `result` command checks integrity again when retrieving a successful result. Retain the request and its immutable, hash-addressed inputs so missing or rejected results can be rerun with a new idempotency key. These are the current runtime guarantees; the tests do not establish hardware durability.
+
 ## Results and provenance
 
 The worker publishes results to a task-specific directory and stores a manifest hash in SQLite. `result` validates job identity, request fingerprint, manifest hash, and every result-file hash before returning metadata. Modified files are rejected.
