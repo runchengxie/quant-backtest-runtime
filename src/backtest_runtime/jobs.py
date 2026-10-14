@@ -64,9 +64,7 @@ class BacktestJobService:
 
     def submit(self, request: BacktestJobRequest) -> JobReceipt:
         if not sys.platform.startswith("linux"):
-            message = (
-                "local backtest jobs v1 requires Linux resource and process controls"
-            )
+            message = "local backtest jobs require Linux resource and process controls"
             raise RuntimeError(message)
         checked_request = BacktestJobRequest.from_mapping(request.to_mapping())
         if (

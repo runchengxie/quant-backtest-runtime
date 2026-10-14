@@ -8,7 +8,7 @@
 
 ## 跑通合成示例
 
-需要 Linux、Python 3.12 或 3.13，以及 `uv`。在仓库根目录执行：
+需要 Linux 和 `uv`。包声明要求 Python 3.12 或更新版本，CI 验证 3.12、3.13，不覆盖其他 Python 版本。在仓库根目录执行：
 
 ```bash
 uv sync --locked --group dev --python 3.13

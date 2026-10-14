@@ -20,7 +20,7 @@ python scripts/release.py --repo . --production "$production_root" --dry-run sta
 python scripts/release.py --repo . --production "$production_root" stage "$release_sha"
 ```
 
-`stage` 只接受已经进入 `origin/main` 历史的提交。它将源码放入固定版本目录，再安装锁定的运行依赖，成功后写入 `.release-ready`。现有同名目录不会被覆盖。
+`stage` 只接受已经进入 `origin/main` 历史的提交。它将源码放入固定版本目录，再安装锁定的运行依赖，成功后写入 `.release-ready`。现有同名目录不会被覆盖。安装失败可能留下没有 `.release-ready` 的目录，`switch` 会拒绝它，再次 `stage` 也不会覆盖。清理或重试前应保留并检查该失败目录。
 
 使用待发布版本自身的脚本和可执行文件跑通合成数据，再切换：
 
@@ -41,7 +41,7 @@ python scripts/release.py --repo . --production "$production_root" --dry-run rol
 python scripts/release.py --repo . --production "$production_root" rollback
 ```
 
-有 `previous` 时回滚到上一版本。首次安装没有上一版本时，回滚会移除 `current` 指针，数据目录保持原样。
+`previous` 为符号链接时回滚到上一版本。首次安装没有上一版本时，回滚会移除 `current` 指针，数据目录保持原样。
 
 ## 故障排查
 
@@ -58,3 +58,9 @@ python scripts/release.py --repo . --production "$production_root" rollback
 | 结果哈希不匹配 | 保留损坏文件与日志排查来源，重新生成输入或任务，不手工改写结果清单 |
 
 备份时使用 SQLite 支持的一致性备份方式，并同时保存输入与结果目录。备份和清理应由部署方安排，本仓库没有常驻备份服务。
+
+## 发布故障恢复
+
+结果目录发布与 SQLite 成功状态提交是两个边界。目录已重命名不等于结果成功，必须完成状态提交。租约恢复会保守处理未完成的任务，不会直接将该目录认定为成功结果。
+
+重复恢复会重试已过期失败任务的输出清理，包括之前清理被中断的情况。无关目录和进程不在清理范围内。
