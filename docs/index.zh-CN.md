@@ -4,7 +4,7 @@
 
 `quant-backtest-runtime` 接收已提交的回测任务，校验请求，使用 SQLite 管理任务状态，运行 worker，并校验和发布结果。它不运行 LLM Agent。
 
-本仓库属于 Quant Research 项目系列：[`quant-platform`](https://github.com/runchengxie/quant-platform) 提供可复用的回测能力；研究侧负责策略、输入来源和研究晋升；本仓库负责通用任务执行。详细分工见[仓库职责](ownership.md)。
+本仓库属于 Quant Research 项目系列：[`quant-platform`](https://github.com/runchengxie/quant-platform) 提供可复用的回测能力；研究侧负责策略、输入来源和研究晋升；本仓库负责通用任务执行。详细分工见[仓库职责](ownership.zh-CN.md)。
 
 ## 跑通合成示例
 
