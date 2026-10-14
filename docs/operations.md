@@ -22,6 +22,8 @@ python scripts/release.py --repo . --production "$production_root" stage "$relea
 
 `stage` accepts only commits already present in `origin/main`. It installs locked dependencies in a versioned directory and writes `.release-ready` after success. Existing release directories are never overwritten.
 
+An installation failure can leave a directory without `.release-ready`; `switch` rejects it and another `stage` does not overwrite it. Preserve and inspect the failed directory before any task-specific cleanup or retry.
+
 Run the synthetic data check from the staged release before switching:
 
 ```bash
@@ -38,6 +40,8 @@ Rollback can also be previewed before execution:
 python scripts/release.py --repo . --production "$production_root" --dry-run rollback
 python scripts/release.py --repo . --production "$production_root" rollback
 ```
+
+When `previous` is a symlink, rollback switches to that release. On a first installation without a previous release, rollback removes only the `current` pointer and leaves runtime data in place.
 
 Production calls use `current/.venv/bin/backtest-job` and pass the three data paths explicitly. Confirm that no worker still uses an old interpreter before removing a release.
 
@@ -61,6 +65,6 @@ Back up SQLite using its consistency-safe backup method and preserve the input a
 
 Result-directory publication and SQLite success are separate boundaries. A renamed
 directory is not a successful result until the job state commits. Lease expiry
-fails an unfinished job conservatively; it never adopts a directory as success.
+treats unfinished jobs conservatively; it never adopts a directory as success.
 Repeated recovery also retries cleanup for expired failed jobs, including after a
 cleanup interruption. Unrelated directories and processes remain outside cleanup.

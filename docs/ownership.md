@@ -14,6 +14,6 @@ After the runtime was split from the research repository, generic task-operation
 
 The research-side `scripts/dev/check_legacy_backtest_jobs.py` checks whether the legacy `ExperimentRegistry` still has unfinished jobs. It remains in the research repository while the historical adapter is in use.
 
-Architecture plans in the platform repository are migration history. Current runtime behavior is documented here. Cross-repository callers should link to these contracts instead of maintaining duplicate task and deployment procedures.
+Plans for extracting this runtime from the platform repository are migration history. Current runtime behavior is documented here. Cross-repository callers should link to these contracts instead of maintaining duplicate task and deployment procedures.
 
 The runtime uses the base dependency set from `quant-platform`. Model training, cross-validation, and technical indicators are optional platform capabilities and are not installed by this runtime.

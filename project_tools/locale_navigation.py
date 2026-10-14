@@ -2,9 +2,31 @@
 
 from __future__ import annotations
 
-from copy import copy
+from copy import copy, deepcopy
 
 from mkdocs.structure.nav import Navigation
+
+_MESSAGES = {
+    "en-US": {
+        "theme.to_dark": "Switch to dark mode",
+        "theme.to_light": "Switch to light mode",
+    },
+    "zh-CN": {
+        "theme.to_dark": "切换至深色模式",
+        "theme.to_light": "切换至浅色模式",
+    },
+}
+
+
+def _localized_palette(theme, chinese: bool):
+    palette = deepcopy(theme.get("palette") or [])
+    messages = _MESSAGES["zh-CN" if chinese else "en-US"]
+    keys = {"default": "theme.to_dark", "slate": "theme.to_light"}
+    for item in palette:
+        key = keys.get(item.get("scheme"))
+        if key and item.get("toggle"):
+            item["toggle"]["name"] = messages.get(key, _MESSAGES["en-US"][key])
+    return palette
 
 
 def _is_chinese(page) -> bool:
@@ -42,6 +64,7 @@ def on_page_context(context, page, config, nav):
     localized_config = copy(config)
     localized_theme = copy(config.theme)
     localized_theme.language = "zh" if chinese else "en"
+    localized_theme.palette = _localized_palette(config.theme, chinese)
     localized_config.theme = localized_theme
     context["config"] = localized_config
     return context

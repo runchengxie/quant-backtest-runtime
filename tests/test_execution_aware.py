@@ -302,6 +302,15 @@ def test_v2_worker_consumes_and_publishes_quant_run_manifest(tmp_path: Path) -> 
         )
         assert manifest["quant_run_manifest_run_id"] == "research-run-1"
         assert (results / receipt.job_id / "quant_run_manifest.json").is_file()
+        root_manifest = results / receipt.job_id / "quant_run_manifest.json"
+        root_manifest.write_bytes(root_manifest.read_bytes() + b"tamper")
+        with pytest.raises(ValueError, match="quant run manifest checksum mismatch"):
+            read_job_result(
+                results,
+                job_id=receipt.job_id,
+                manifest_sha256=status.result_sha256 or "",
+                request_sha256=request.request_sha256,
+            )
     finally:
         store.close()
 

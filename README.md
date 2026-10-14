@@ -8,7 +8,7 @@ Within the Quant Research project family, [`quant-platform`](https://github.com/
 
 ## Run the synthetic example
 
-Linux, Python 3.12 or 3.13, and `uv` are required:
+Linux and `uv` are required. Package metadata requires Python 3.12 or newer; CI validates 3.12 and 3.13. Other Python versions are not covered by these jobs:
 
 ```bash
 uv sync --locked --group dev --python 3.13
