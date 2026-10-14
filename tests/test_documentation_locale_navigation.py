@@ -67,7 +67,7 @@ def test_sidebar_and_search_pages_follow_the_current_locale(monkeypatch) -> None
     hook.on_page_context(
         english_context,
         SimpleNamespace(file=SimpleNamespace(src_uri="index.md")),
-        SimpleNamespace(theme=SimpleNamespace(language="en")),
+        SimpleNamespace(theme=SimpleNamespace(language="en", get=lambda key: None)),
         navigation,
     )
     assert english_context["nav"].items == [english_item]
@@ -78,9 +78,57 @@ def test_sidebar_and_search_pages_follow_the_current_locale(monkeypatch) -> None
     hook.on_page_context(
         chinese_context,
         SimpleNamespace(file=SimpleNamespace(src_uri="index.zh-CN.md")),
-        SimpleNamespace(theme=SimpleNamespace(language="en")),
+        SimpleNamespace(theme=SimpleNamespace(language="en", get=lambda key: None)),
         navigation,
     )
     assert chinese_context["nav"].items == [chinese_item]
     assert chinese_context["nav"].pages == [chinese_item]
     assert chinese_context["config"].theme.language == "zh"
+
+
+def test_theme_labels_follow_locale_without_changing_palette_or_shared_config(
+    monkeypatch,
+) -> None:
+    hook = _load_navigation_hook(monkeypatch)
+    palette = [
+        {
+            "scheme": "default",
+            "primary": "blue grey",
+            "toggle": {"name": "Switch to dark mode", "icon": "moon"},
+        },
+        {
+            "scheme": "slate",
+            "primary": "blue grey",
+            "toggle": {"name": "Switch to light mode", "icon": "sun"},
+        },
+    ]
+    config = SimpleNamespace(
+        theme=SimpleNamespace(language="en", get=lambda key: palette)
+    )
+    navigation = _Navigation([], [])
+    for filename, language, labels in (
+        ("index.zh-CN.md", "zh", ["切换至深色模式", "切换至浅色模式"]),
+        ("index.md", "en", ["Switch to dark mode", "Switch to light mode"]),
+        ("index.fr-FR.md", "en", ["Switch to dark mode", "Switch to light mode"]),
+    ):
+        context = {}
+        hook.on_page_context(
+            context,
+            SimpleNamespace(file=SimpleNamespace(src_uri=filename)),
+            config,
+            navigation,
+        )
+        localized = context["config"].theme
+        assert localized.language == language
+        assert [entry["toggle"]["name"] for entry in localized.palette] == labels
+        assert [entry["scheme"] for entry in localized.palette] == ["default", "slate"]
+        assert [entry["toggle"]["icon"] for entry in localized.palette] == [
+            "moon",
+            "sun",
+        ]
+        assert all(entry["primary"] == "blue grey" for entry in localized.palette)
+    assert config.theme.language == "en"
+    assert [entry["toggle"]["name"] for entry in palette] == [
+        "Switch to dark mode",
+        "Switch to light mode",
+    ]

@@ -22,6 +22,12 @@ def main() -> None:
 
     assert '<html lang="en"' in english_document
     assert '<html lang="zh"' in chinese_document
+    assert 'aria-label="Switch to dark mode"' in english_document
+    assert 'aria-label="Switch to light mode"' in english_document
+    assert 'aria-label="切换至深色模式"' in chinese_document
+    assert 'aria-label="切换至浅色模式"' in chinese_document
+    assert 'aria-label="Switch to dark mode"' not in chinese_document
+    assert 'aria-label="Switch to light mode"' not in chinese_document
 
     for label in (
         "Backtest jobs and results",

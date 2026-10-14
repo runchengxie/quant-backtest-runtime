@@ -10,6 +10,18 @@ permissions:
   contents: read
 
 jobs:
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install locked documentation dependencies
+        run: uv sync --locked --group docs --python 3.13
+      - name: Build documentation and check localized navigation
+        run: |
+          uv run --locked --group docs mkdocs build --strict
+          uv run --locked --group docs python project_tools/check_locale_navigation.py
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -16,10 +16,13 @@ uv run --locked coverage report
 uv run --locked python scripts/smoke_backtest.py
 uv run --locked pip-audit --local
 uv run --locked --group docs mkdocs build --strict
+uv run --locked --group docs python project_tools/check_locale_navigation.py
 git diff --check
 ```
 
 CI runs the static checks, tests, and synthetic CLI example on Linux with Python 3.12 and 3.13. Dependency auditing runs on Python 3.13. The documentation workflow builds and publishes MkDocs in strict mode, so broken internal links fail the build.
+
+Pull requests also build the docs and check English/Chinese sidebar, HTML language and theme-toggle labels. Locale changes affect presentation, not request fields or result data. The page hook preserves theme schemes and icons and uses English for document paths outside the `zh-CN` suffix. These PR checks do not publish the site.
 
 Ruff checks imports, common errors, unsafe exception handling, obsolete syntax, and complexity, with a cyclomatic complexity limit of 10. ty checks runtime code and maintenance scripts. Request validation and tests enforce the content of dynamic JSON fields typed as `Any`.
 
