@@ -222,3 +222,21 @@ def test_nonfinite_lease_is_rejected_before_claiming(tmp_path, lease):
         assert service.get_status(receipt.job_id).status == "SUBMITTED"
     finally:
         registry.close()
+
+
+def test_complete_rejects_result_reference_for_another_job(tmp_path) -> None:
+    registry, service = _service(tmp_path)
+    try:
+        first = service.submit(BacktestJobRequest.from_mapping(_request(key="first")))
+        second = service.submit(BacktestJobRequest.from_mapping(_request(key="second")))
+        service.claim(first.job_id, worker_pid=1234, lease_seconds=60)
+        with pytest.raises(ValueError, match="result_ref must match the completed job"):
+            service.complete(
+                first.job_id,
+                result_ref=f"backtest-job://{second.job_id}",
+                result_sha256="e" * 64,
+            )
+        assert service.get_status(first.job_id).status == "RUNNING"
+        assert service.get_status(second.job_id).status == "SUBMITTED"
+    finally:
+        registry.close()
