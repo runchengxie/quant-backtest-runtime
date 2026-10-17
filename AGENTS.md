@@ -9,7 +9,7 @@
 ## 开发与交付
 
 - 先检查工作树、分支、远端和已有 worktree，保留其他任务的改动。
-- 拉取远端后，从 `origin/main` 创建独立分支和 worktree。临时 worktree 放在 `/home/richard/code/.worktrees/`。
+- 拉取远端后，从 `origin/main` 创建独立分支和 worktree。临时 worktree 放在 `CODE_ROOT/.worktrees/<repo>-<topic>`；`CODE_ROOT` 从工作区明确指定的机器配置或环境变量解析，不使用固定的个人目录。
 - 使用锁定依赖，在任务 worktree 完成修改和验证。检查命令见 [开发文档](docs/development.md)。提交前必须通过 Ruff、ty、pytest 覆盖率检查和合成数据 CLI 检查。
 - 提交并推送任务分支，通过面向 `main` 的 PR 交付。审查和必需检查完成后合并，不跳过 hooks、不直推 `main`、不强推争抢合并。
 - 确认 PR 已合并且工作树没有唯一未保存内容后，清理本任务分支和 worktree。主检出干净时才 fast-forward 同步。
