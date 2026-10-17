@@ -24,7 +24,7 @@ dev = [
 docs = ["mkdocs-material>=9.6,<10"]
 
 [tool.uv.sources]
-quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "dd837a0ec7e8d323aeeac48dbcb1e8914dc5ae4a" }
+quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "15ec62b66e894395d694049eaaace931de4a1265" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
