@@ -154,6 +154,8 @@ class BacktestJobService:
     ) -> JobStatus:
         if not re.fullmatch(r"backtest-job://[0-9a-f-]{36}", result_ref):
             raise ValueError("result_ref must be a backtest-job UUID reference")
+        if result_ref != f"backtest-job://{job_id}":
+            raise ValueError("result_ref must match the completed job")
         if not re.fullmatch(r"[0-9a-f]{64}", result_sha256):
             raise ValueError("result_sha256 must be a lowercase SHA-256 digest")
         return self._terminal(
