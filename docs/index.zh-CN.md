@@ -21,7 +21,7 @@ uv run --locked python scripts/smoke_backtest.py
 {"status": "SUCCEEDED", "job_id": "923e452a-c73b-4932-a7d1-52d329da4f9f"}
 ```
 
-上面是一次成功运行的输出。每次生成的 `job_id` 不同，`SUCCEEDED` 表示任务已完成并通过结果校验。worker 是独立执行任务的进程，负责调用回测能力、写出结果并更新状态。成功任务依次经过 `SUBMITTED`（已提交）、`RUNNING`（执行中）和 `SUCCEEDED`（已完成）。脚本提交任务后持续查询状态，完成后读取结果；临时目录在脚本退出时删除。
+上面是一次成功运行的输出。每次生成的 `job_id` 不同，`SUCCEEDED` 表示任务已完成并通过结果校验。worker 是独立执行任务的进程，负责调用回测能力、写出结果并更新状态。成功任务依次经过 `SUBMITTED`（已提交）、`RUNNING`（执行中）和 `SUCCEEDED`（已完成）。脚本提交任务后持续查询状态，完成后读取结果。临时目录在脚本退出时删除。
 
 ## 阅读顺序
 
