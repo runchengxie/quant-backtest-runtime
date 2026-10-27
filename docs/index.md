@@ -4,7 +4,7 @@
 
 `quant-backtest-runtime` accepts submitted backtest jobs, validates requests, manages job state in SQLite, runs workers, and validates and publishes results. It does not run LLM agents.
 
-Within the Quant Research project family, [`quant-platform`](https://github.com/runchengxie/quant-platform) provides reusable backtest capabilities, the research layer owns strategies and promotion, and this repository owns generic job execution. See [Repository ownership](ownership.md) for the boundaries.
+Within the Quant Research project family, [`quant-platform`](https://github.com/runchengxie/quant-platform) provides reusable backtest capabilities, the research layer owns strategies and promotion (deciding whether research evidence qualifies for the next validation or use stage), and this repository owns generic job execution. See [Repository ownership](ownership.md) for the boundaries.
 
 ## Run the synthetic example
 
@@ -16,6 +16,12 @@ uv run --locked python scripts/smoke_backtest.py
 ```
 
 The example uses synthetic data in a temporary directory. It submits a job and validates the result without requiring private research data.
+
+```json
+{"status": "SUCCEEDED", "job_id": "923e452a-c73b-4932-a7d1-52d329da4f9f"}
+```
+
+The output above is from a successful run. Each run generates a different `job_id`; `SUCCEEDED` means the job finished and its result passed validation. A worker is the separate process that executes the backtest, writes the result, and updates job state. Successful jobs progress from `SUBMITTED` to `RUNNING` to `SUCCEEDED`. The script polls status after submission and reads the completed result. Its temporary directory is removed on exit.
 
 ## Reading order
 
