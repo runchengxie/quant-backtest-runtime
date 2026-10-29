@@ -84,7 +84,9 @@ A worker claim sets its lease to `wall_seconds + 30` seconds; CLI startup has a 
 
 Recovery tests cover process interruption and a result-directory rename followed by a failed state commit. A published directory alone does not make a job successful; lease recovery removes unpublished output.
 
-Result publication currently does not call `fsync` on result files or their directories. Committing `SUCCEEDED` in SQLite therefore does not establish that result bytes will survive a machine power loss. The `result` command checks integrity again when retrieving a successful result. Retain the request and its immutable, hash-addressed inputs so missing or rejected results can be rerun with a new idempotency key. These are the current runtime guarantees; the tests do not establish hardware durability.
+Before committing `SUCCEEDED`, publication closes and `fsync`s every staged result file (including nested payloads and the manifest), syncs staging directories from leaves upward, renames the staged directory, and syncs the result parent directory. The result-root ancestry is also synced before staging, including directories created for this publication. A failed sync or rename prevents the success transition. A failure after rename can leave an unpublished directory for lease recovery to remove; existing lease fencing and result hash checks still apply.
+
+This publication path requires POSIX directory `fsync`; Windows and filesystems that reject directory syncing fail closed rather than silently weakening the guarantee. Successful barriers request persistence according to the filesystem and storage stack; they do not establish a universal hardware or power-loss guarantee. Tests inject I/O faults and check ordering, not physical power loss. The `result` command checks integrity again when retrieving a successful result. Retain the request and its immutable, hash-addressed inputs so missing or rejected results can be rerun with a new idempotency key.
 
 ## Results and provenance
 
