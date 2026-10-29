@@ -19,6 +19,6 @@ Validation on Python 3.13.14 against source base `2a2dc0a` and locked platform r
 - Full pytest suite under coverage: 56 passed; combined statement/branch coverage 80% (threshold 75%).
 - Synthetic CLI: `SUCCEEDED`, with result retrieval validated.
 - Strict MkDocs build and locale navigation check: passed; generated site kept outside source.
-- Dependency audit: failed on the existing locked transitive dependency `msgpack==1.2.2`, reported as CVE-2026-114613 (fix version 1.2.3). This bounded change does not modify dependencies. The three local/Git project packages were unavailable for PyPI vulnerability auditing.
+- Dependency audit initially failed on the existing locked transitive dependency `msgpack==1.2.2`, reported as CVE-2026-114613 (fix version 1.2.3). A separate security patch refresh changed only `msgpack` to compatible version 1.2.4. The repeated audit passed with no known vulnerabilities; the three local/Git project packages were unavailable for PyPI vulnerability auditing.
 
-The audit limitation must be resolved before delivery is treated as having all development checks passing. No production state or inputs were used.
+The complete test, static-analysis, synthetic CLI, documentation, and dependency audit checks passed again after the security patch refresh. No production state or inputs were used.
