@@ -14,6 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from .durability import prepare_result_root, sync_directory, sync_result_tree
 from .jobs import BacktestJobRequest, BacktestJobService
 from .store import JobStore, RegistryConflict
 
@@ -255,7 +256,7 @@ def _write_result(
     service: BacktestJobService,
     result_root: Path,
 ) -> tuple[str, str]:
-    result_root.mkdir(parents=True, exist_ok=True)
+    prepare_result_root(result_root)
     final_dir = result_root / job_id
     if final_dir.exists():
         raise FileExistsError(f"result directory already exists: {job_id}")
@@ -352,7 +353,9 @@ def _write_result(
             encoding="utf-8",
         )
         manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        sync_result_tree(tmp_dir)
         tmp_dir.replace(final_dir)
+        sync_directory(result_root)
         return f"backtest-job://{job_id}", manifest_sha256
     except BaseException:
         shutil.rmtree(tmp_dir, ignore_errors=True)
