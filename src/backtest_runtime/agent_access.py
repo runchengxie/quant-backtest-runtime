@@ -49,7 +49,11 @@ def build_plan(
     if request.quant_run_manifest_ref is not None:
         service.validate_quant_run_manifest(request)
     validation = _engine_validation(request, service, inputs, engine)
-    executable_sha256 = request.config["executable_sha256"] if validation else None
+    executable_sha256 = (
+        request.config["executable_sha256"]
+        if validation
+        else _session_executable_hash(request, engine)
+    )
     payload = {
         "schema": "quant.backtest_plan.v1",
         "request": request.to_mapping(),
@@ -67,7 +71,9 @@ def build_plan(
             else "not_applicable",
             "executable_hash": "passed" if executable_sha256 else "not_applicable",
             "engine_request_semantics": "passed"
-            if request.schema_version == 5
+            if validation
+            else "not_checked"
+            if request.schema_version == 6
             else "not_applicable",
             "parquet_rows": "not_checked",
             "clock_table_consistency": "not_checked",
@@ -83,6 +89,24 @@ def build_plan(
         payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
     ).encode()
     return {**payload, "plan_sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def _session_executable_hash(
+    request: BacktestJobRequest, engine: Path | None
+) -> str | None:
+    if request.schema_version != 6:
+        return None
+    if engine is None or not engine.is_absolute():
+        raise AccessError(
+            "INVALID_REQUEST", "engine jobs require an absolute engine executable"
+        )
+    if not engine.is_file() or not os.access(engine, os.X_OK):
+        raise AccessError("ENGINE_UNAVAILABLE", "Engine executable is unavailable")
+    with engine.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    if digest != request.config["executable_sha256"]:
+        raise AccessError("INTEGRITY_FAILURE", "Engine executable digest mismatch")
+    return digest
 
 
 def _engine_validation(

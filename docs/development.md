@@ -57,7 +57,7 @@ It does not change v1–v4 normalization or fingerprints. It currently provides 
 **diagnostic final snapshot**, not the execution-aware daily ledger of v2.
 
 Install/build the engine from a reviewed, merged revision outside task worktrees.
-Dedicated CI pins provider `a2dc923b01c46389f090db7865175c5d87b6819c` and tests the real binary with this
+Dedicated CI pins provider `3ee74bfa21d743e595ce61d0ac06b97dd588ebd6` and tests the real binary with this
 consumer revision; local validation uses that provider's identical tested sources.
 Pass the absolute executable using the operator CLI option `--engine-executable`.
 The submitted request cannot select an arbitrary executable path or shell command.
@@ -129,3 +129,34 @@ BACKTEST_ENGINE_TEST_EXECUTABLE=/absolute/path/to/quant-backtest-engine   uv run
 Without that variable the real-engine test is skipped; dedicated `rust-engine` CI
 builds the pinned provider and must pass it. Other lifecycle tests use controlled
 fixture processes to verify failure, cancellation, hard parent death and timeout.
+
+## Session ledger jobs (v6)
+
+v6 selects `nautilus.session_replay` and consumes an immutable `engine_request.v2`
+artifact. Its other job fields match v5: an executable SHA-256 config, empty execution
+mapping and explicit wall/memory budgets. v1–v5 normalization and fingerprints remain
+unchanged. Discovery and side-effect-free preflight include v6 and verify its binary.
+
+The worker supervises the same held-inode child boundary and publishes
+`quant.engine_job_result.v2` with one `engine_result.json`. Verification checks strict
+nested fields, USD/CNY identity, raw-price basis, active T+1 flag, ISO session order,
+valuation timezone, order/fill quantities, rejection reasons, daily cash/positions/NAV,
+per-fill currency rounding and commission. It reconstructs reported cash and shares
+from fills to reconcile the ledger, without deciding trades or matching orders.
+T+1 assertions are independently checked against prior-session holdings. Before
+publication the result is bound to input currency, initial cash, active rules, session
+coverage, requested orders and their information/valuation clocks.
+
+Example: change the v5 job wrapper to `schema_version: 6` and
+`backend: nautilus.session_replay`, and point `engine_request_ref` at the engine's
+[session fixture](https://github.com/runchengxie/quant-backtest-engine/blob/3ee74bfa21d743e595ce61d0ac06b97dd588ebd6/fixtures/sessions.json).
+The synthetic result has first-day cash 8999/NAV 10099, a same-day T+1 denial, and
+final cash/NAV 10197.8. The runtime summary retains the common cash/positions/equity/
+commission keys, while the inventory JSON retains the complete session ledger.
+
+A session ledger remains diagnostic evidence unless a separate consumer supplies the
+full research clock, producer and canonical execution-aware mapping. Corporate actions,
+receivables, delisting policies, daily-volume participation and exchange-specific tax
+schedules are not inferred. Keep the existing Python backend for unsupported scenarios.
+Dedicated CI tests both v5 and v6 against merged provider
+`3ee74bfa21d743e595ce61d0ac06b97dd588ebd6`.

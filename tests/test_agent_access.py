@@ -43,7 +43,7 @@ def test_discovery_without_storage_paths(tmp_path, capsys):
     operations = {row["id"]: row for row in result["operations"]}
     assert operations["inspect"]["side_effects"] == []
     assert "recovery" in operations["status"]["side_effects"]
-    assert result["request_versions"] == [1, 2, 3, 4, 5]
+    assert result["request_versions"] == [1, 2, 3, 4, 5, 6]
     assert not list(tmp_path.iterdir())
 
 

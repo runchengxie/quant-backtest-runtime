@@ -10,23 +10,29 @@ from typing import Any
 
 from .contracts import BacktestJobRequest
 from .engine_protocol import engine_summary, validate_engine_result
+from .engine_sessions_protocol import session_summary, validate_session_result
 
 
 def write_engine_result(
     root: Path, result: Any, *, job_id: str, request: BacktestJobRequest
 ) -> dict[str, Any]:
-    result = validate_engine_result(result)
+    session = request.schema_version == 6
+    result = (
+        validate_session_result(result) if session else validate_engine_result(result)
+    )
     path = root / "engine_result.json"
     path.write_text(
         json.dumps(result, sort_keys=True, allow_nan=False) + "\n", encoding="utf-8"
     )
     return {
-        "schema_version": "quant.engine_job_result.v1",
+        "schema_version": "quant.engine_job_result.v2"
+        if session
+        else "quant.engine_job_result.v1",
         "job_id": job_id,
         "request_sha256": request.request_sha256,
         "backend": request.backend,
         "executable_sha256": request.config["executable_sha256"],
-        "summary": engine_summary(result),
+        "summary": session_summary(result) if session else engine_summary(result),
         "inventory": [
             {
                 "path": path.name,
@@ -38,7 +44,11 @@ def write_engine_result(
 
 
 def verify_engine_result(root: Path, manifest: dict[str, Any]) -> None:
-    if manifest.get("backend") != "nautilus.quote_market_orders":
+    session = manifest.get("schema_version") == "quant.engine_job_result.v2"
+    expected_backend = (
+        "nautilus.session_replay" if session else "nautilus.quote_market_orders"
+    )
+    if manifest.get("backend") != expected_backend:
         raise ValueError("invalid independent engine backend")
     digest = manifest.get("executable_sha256")
     if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
@@ -59,6 +69,9 @@ def verify_engine_result(root: Path, manifest: dict[str, Any]) -> None:
         path.read_bytes()
     ).hexdigest() != item.get("sha256"):
         raise ValueError("engine result checksum mismatch")
-    result = validate_engine_result(json.loads(path.read_text(encoding="utf-8")))
-    if manifest.get("summary") != engine_summary(result):
+    validator = validate_session_result if session else validate_engine_result
+    result = validator(json.loads(path.read_text(encoding="utf-8")))
+    if manifest.get("summary") != (
+        session_summary(result) if session else engine_summary(result)
+    ):
         raise ValueError("engine summary does not match verified result")

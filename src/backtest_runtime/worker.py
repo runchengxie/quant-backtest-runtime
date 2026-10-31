@@ -268,7 +268,7 @@ def _write_result(
             quant_manifest_path, quant_manifest = service.validate_quant_run_manifest(
                 request
             )
-        if request.schema_version == 5:
+        if request.schema_version in {5, 6}:
             from .engine_publication import write_engine_result
 
             manifest = write_engine_result(
@@ -452,7 +452,7 @@ def _execute_claimed_job(
     signal.alarm(request.budgets["wall_seconds"])
     try:
         _apply_memory_limit(request.budgets["memory_mb"])
-        if request.schema_version == 5:
+        if request.schema_version in {5, 6}:
             from .engine_runner import run_engine
 
             result = run_engine(request, service, engine_executable)
