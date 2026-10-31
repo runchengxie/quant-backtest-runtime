@@ -87,3 +87,48 @@ def test_all_wire_fingerprints_match_pre_migration_baseline(version, expected):
             "budgets": {"wall_seconds": 30, "memory_mb": 4096},
         }
     assert BacktestJobRequest.from_mapping(mapping).request_sha256 == expected
+
+
+def test_persisted_v2_without_legacy_fails_before_claim(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    from backtest_runtime import legacy, worker
+    from backtest_runtime.jobs import BacktestJobService
+    from backtest_runtime.store import JobStore
+
+    source = Path(__file__).resolve().parents[1] / "examples" / "request-v2.json"
+    request = BacktestJobRequest.from_mapping(json.loads(source.read_text()))
+    database = tmp_path / "jobs.sqlite"
+    store = JobStore(database)
+    try:
+        receipt = BacktestJobService(
+            store,
+            artifact_root=tmp_path / "artifacts",
+            result_root=tmp_path / "results",
+        ).submit(request)
+        monkeypatch.setattr(legacy, "find_spec", lambda name: None)
+
+        def unexpected_claim(*args, **kwargs):
+            pytest.fail("missing dependencies must fail before claiming")
+
+        monkeypatch.setattr(BacktestJobService, "claim", unexpected_claim)
+        assert (
+            worker.execute_job(
+                receipt.job_id,
+                registry_path=database,
+                artifact_root=tmp_path / "artifacts",
+                result_root=tmp_path / "results",
+            )
+            == 1
+        )
+        row = store.get_backtest_job(receipt.job_id)
+        assert row is not None
+        assert row["status"] == "FAILED"
+        assert row["error_code"] == "LEGACY_DEPENDENCY_UNAVAILABLE"
+        assert "quant-backtest-runtime[legacy]" in row["error_message"]
+        assert row["worker_pid"] is None
+        assert row["lease_expires_at"] is None
+        assert row["result_ref"] is None
+        assert not (tmp_path / "results").exists()
+    finally:
+        store.close()

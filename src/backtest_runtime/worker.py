@@ -402,6 +402,9 @@ def execute_job(
         try:
             mapping = json.loads(row["request_json"])
             request = BacktestJobRequest.from_mapping(mapping)
+        except LegacyDependencyUnavailable as error:
+            service.fail_submitted(job_id, code=error.code, message=str(error))
+            return 1
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             service.fail_submitted(
                 job_id,
