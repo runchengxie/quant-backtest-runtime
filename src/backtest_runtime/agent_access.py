@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .contracts import BacktestJobRequest
+from .engine_validation import EngineValidationError, validate_request
 from .jobs import BacktestJobService
 
 
@@ -42,22 +43,13 @@ def build_plan(
     inputs = {}
     for name, ref in request.inputs.items():
         if ref is not None:
-            service.resolve_artifact(ref)
+            if request.schema_version != 5:
+                service.resolve_artifact(ref)
             inputs[name] = ref.rsplit("/", 1)[-1]
     if request.quant_run_manifest_ref is not None:
         service.validate_quant_run_manifest(request)
-    executable_sha256 = None
-    if request.schema_version == 5:
-        if engine is None or not engine.is_absolute():
-            raise AccessError(
-                "INVALID_REQUEST", "v5 requires an absolute engine executable"
-            )
-        if not engine.is_file() or not os.access(engine, os.X_OK):
-            raise AccessError("ENGINE_UNAVAILABLE", "Engine executable is unavailable")
-        with engine.open("rb") as source:
-            executable_sha256 = hashlib.file_digest(source, "sha256").hexdigest()
-        if executable_sha256 != request.config["executable_sha256"]:
-            raise AccessError("INTEGRITY_FAILURE", "Engine executable digest mismatch")
+    validation = _engine_validation(request, service, inputs, engine)
+    executable_sha256 = request.config["executable_sha256"] if validation else None
     payload = {
         "schema": "quant.backtest_plan.v1",
         "request": request.to_mapping(),
@@ -74,7 +66,7 @@ def build_plan(
             if request.quant_run_manifest_ref
             else "not_applicable",
             "executable_hash": "passed" if executable_sha256 else "not_applicable",
-            "engine_request_semantics": "not_checked"
+            "engine_request_semantics": "passed"
             if request.schema_version == 5
             else "not_applicable",
             "parquet_rows": "not_checked",
@@ -85,10 +77,38 @@ def build_plan(
             "promotion": "not_checked",
         },
     }
+    if validation is not None:
+        payload["engine_validation"] = validation
     encoded = json.dumps(
         payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
     ).encode()
     return {**payload, "plan_sha256": hashlib.sha256(encoded).hexdigest()}
+
+
+def _engine_validation(
+    request: BacktestJobRequest,
+    service: ArtifactReader,
+    inputs: dict[str, str],
+    engine: Path | None,
+) -> dict[str, Any] | None:
+    if request.schema_version != 5:
+        return None
+    if engine is None or not engine.is_absolute():
+        raise AccessError(
+            "INVALID_REQUEST", "v5 requires an absolute engine executable"
+        )
+    if not engine.is_file() or not os.access(engine, os.X_OK):
+        raise AccessError("ENGINE_UNAVAILABLE", "Engine executable is unavailable")
+    input_digest = inputs["engine_request_ref"]
+    try:
+        return validate_request(
+            engine,
+            request.config["executable_sha256"],
+            service.artifact_root / "sha256" / input_digest,
+            input_digest,
+        )
+    except EngineValidationError as error:
+        raise AccessError(error.code, str(error)) from error
 
 
 class ArtifactReader:

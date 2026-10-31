@@ -89,6 +89,23 @@ atomic replacement; do not modify an executable inode in place during a job.
 backtest-job --database /data/jobs.sqlite --artifact-root /data/artifacts   --result-root /data/results --engine-executable /releases/engine/quant-backtest-engine   submit /data/job-v5.json
 ```
 
+Agent `plan` and plan-bound `submit` perform owner-authoritative static v5
+validation before opening the job database. The runtime reads at most 1 MiB plus
+one byte, verifies the input digest, and sends those exact bytes to the pinned
+engine's `validate -` command through a held executable descriptor. The child gets
+a minimal environment, a 10-second deadline and independently enforced 8-KiB
+stdout/stderr limits; overflow or timeout kills and reaps it. This operation creates
+no job state or temporary output files and never runs a simulation.
+
+A successful v5 plan marks `engine_request_semantics` as `passed` and binds the
+strict `engine_validation.v1` receipt (validator version 1 and exact input SHA-256)
+into `plan_sha256`. Invalid requests produce `ENGINE_REQUEST_INVALID`; an older or
+unsupported validator, malformed receipt, process failure or resource limit gives
+`ENGINE_VALIDATION_UNAVAILABLE`. Install a compatible immutable engine release;
+there is no fallback to unchecked v5 plans. v1–v4 plan digests and all request
+fingerprints keep their existing contracts. The worker still verifies the original
+binary/input digests and the engine validates again at execution time.
+
 The Python worker remains the sole SQLite writer and result publisher. The Rust child
 inherits its address-space limit; timeout/cancellation kills and reaps the child.
 Linux parent-death SIGKILL handles hard worker death and expired-worker recovery.
