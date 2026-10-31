@@ -21,6 +21,11 @@ def validator(root: Path, body: str = "") -> Path:
     binary = root / "validator"
     binary.write_text(
         f"#!{sys.executable}\n"
+        + """import sys,json
+if sys.argv[1:] == ['capabilities']:
+    print(json.dumps({'schema_version':'engine_capabilities.v1','request_schema':'engine_request.v1','validator_version':1}))
+    sys.exit(0)
+"""
         + (
             body
             or """import hashlib,json,sys
@@ -157,9 +162,9 @@ def test_deadline_and_stream_caps_kill_and_reap(tmp_path, monkeypatch, body):
         checked_plan(request, tmp_path / "artifacts", binary)
     assert failure.value.code == "ENGINE_VALIDATION_UNAVAILABLE"
     assert time.monotonic() - start < 2
-    assert children[0].returncode == -signal.SIGKILL
+    assert children[-1].returncode == -signal.SIGKILL
     with pytest.raises(ChildProcessError):
-        os.waitpid(children[0].pid, os.WNOHANG)
+        os.waitpid(children[-1].pid, os.WNOHANG)
 
 
 def test_input_and_executable_path_replacement_cannot_change_validation(
@@ -173,7 +178,7 @@ def test_input_and_executable_path_replacement_cannot_change_validation(
     input_path = tmp_path / "artifacts/sha256" / digest
     original = engine_validation._invoke
 
-    def replace(binary_fd, data):
+    def replace(binary_fd, data, **kwargs):
         replacement = tmp_path / "replacement"
         replacement.write_text("#!/bin/sh\nexit 2\n")
         replacement.chmod(0o755)
@@ -181,7 +186,7 @@ def test_input_and_executable_path_replacement_cannot_change_validation(
         other = tmp_path / "other-input"
         other.write_bytes(b"{}")
         other.replace(input_path)
-        return original(binary_fd, data)
+        return original(binary_fd, data, **kwargs)
 
     monkeypatch.setattr(engine_validation, "_invoke", replace)
     plan = checked_plan(request, tmp_path / "artifacts", binary)
@@ -280,3 +285,48 @@ def test_real_engine_static_validation(tmp_path, mutation):
             checked_plan(request, tmp_path / "artifacts", binary)
         assert failure.value.code == "ENGINE_REQUEST_INVALID"
     assert not (tmp_path / "jobs.sqlite").exists()
+
+
+def test_unadvertised_validator_exiting_two_is_unavailable(tmp_path):
+    binary = validator(tmp_path, "import sys; sys.exit(2)")
+    # An unrelated executable has no validator advertisement and must not be
+    # mistaken for an engine rejecting request semantics.
+    binary.write_text(f"#!{sys.executable}\nimport sys; sys.exit(2)\n")
+    with pytest.raises(AccessError) as failure:
+        checked_plan(planned(tmp_path, binary), tmp_path / "artifacts", binary)
+    assert failure.value.code == "ENGINE_VALIDATION_UNAVAILABLE"
+
+
+@pytest.mark.parametrize("version", [True, 0, 2, "1", None])
+def test_unsupported_capability_version_cannot_validate(tmp_path, version):
+    binary = validator(tmp_path)
+    source = binary.read_text()
+    header = f"""import sys,json
+if sys.argv[1:] == ['capabilities']:
+    print(json.dumps({{'schema_version':'engine_capabilities.v1','request_schema':'engine_request.v1','validator_version':{version!r}}}))
+    sys.exit(0)
+"""
+    binary.write_text(
+        source.split("\n", 1)[0] + "\n" + header + source.split("\n", 1)[1]
+    )
+    with pytest.raises(AccessError) as failure:
+        checked_plan(planned(tmp_path, binary), tmp_path / "artifacts", binary)
+    assert failure.value.code == "ENGINE_VALIDATION_UNAVAILABLE"
+
+
+def test_capabilities_and_validation_share_one_deadline(tmp_path, monkeypatch):
+    from backtest_runtime import engine_validation
+
+    binary = validator(tmp_path)
+    source = binary.read_text()
+    # Each operation individually fits, but their combined cost exceeds 0.3s.
+    source = (
+        source.split("\n", 1)[0]
+        + "\nimport time; time.sleep(0.2)\n"
+        + source.split("\n", 1)[1]
+    )
+    binary.write_text(source)
+    monkeypatch.setattr(engine_validation, "TIMEOUT_SECONDS", 0.3)
+    with pytest.raises(AccessError) as failure:
+        checked_plan(planned(tmp_path, binary), tmp_path / "artifacts", binary)
+    assert failure.value.code == "ENGINE_VALIDATION_UNAVAILABLE"

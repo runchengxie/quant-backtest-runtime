@@ -92,8 +92,10 @@ backtest-job --database /data/jobs.sqlite --artifact-root /data/artifacts   --re
 Agent `plan` and plan-bound `submit` perform owner-authoritative static v5
 validation before opening the job database. The runtime reads at most 1 MiB plus
 one byte, verifies the input digest, and sends those exact bytes to the pinned
-engine's `validate -` command through a held executable descriptor. The child gets
-a minimal environment, a 10-second deadline and independently enforced 8-KiB
+engine's `validate -` command through a held executable descriptor. First it
+checks `capabilities` through that same descriptor and requires validator version 1.
+The two child operations share one 10-second deadline, use a minimal environment
+and each have independently enforced 8-KiB
 stdout/stderr limits; overflow or timeout kills and reaps it. This operation creates
 no job state or temporary output files and never runs a simulation.
 

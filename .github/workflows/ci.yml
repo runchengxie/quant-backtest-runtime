@@ -72,4 +72,4 @@ jobs:
       - name: Real Rust engine job and lifecycle checks
         env:
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
-        run: uv run --locked pytest -q tests/test_rust_engine_jobs.py tests/test_engine_sessions.py
+        run: uv run --locked pytest -q tests/test_engine_validation.py tests/test_rust_engine_jobs.py tests/test_engine_sessions.py

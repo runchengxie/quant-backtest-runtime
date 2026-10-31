@@ -285,3 +285,50 @@ def test_nonobject_request_is_invalid_request(tmp_path, capsys):
         == 1
     )
     assert json.loads(capsys.readouterr().err)["code"] == "INVALID_REQUEST"
+
+
+@pytest.mark.parametrize(
+    "version,request_sha256,plan_sha256",
+    [
+        (
+            1,
+            "dffcbd5a73f2aa4fa7b764990a56c18d9ee7f25aca481ffcd7b4dd8525065bec",
+            "1ae968d8705a46ccd9b3bb6cb926c3542b0acaed229a8d6e6dc9adbcbec9f886",
+        ),
+        (
+            2,
+            "f3d4c6fb938045fe9b0822741560ee4f16c96b7e2ecd2ebc80bdcbfb77992a7a",
+            "eca475b74bc35578f2ce37e8f866cf9bd191106657b8dfd1dbd236c858b18b5f",
+        ),
+        (
+            3,
+            "04cf530016ec3182bedbdb1eca28286c11b1af26f9aa3a15a6a6c463815d7bb6",
+            "2d5e7185266790ae7dc6fec34295c640e2e8d09f0c06e049f03036f885377f06",
+        ),
+        (
+            4,
+            "dd01ebd5afcfaaf287454011032c304001c439d0b5a1883da08102786f9c9b28",
+            "b0af0382d11f0b7736035448c0a1c8f43921e92e8c94fe1d4f00f5ada95e54e9",
+        ),
+    ],
+)
+def test_legacy_plan_and_request_golden_identities(
+    tmp_path, version, request_sha256, plan_sha256
+):
+    # Captured from d2f20b4 before v5 validation was added, using locked synthetic
+    # fixtures. A new v5 receipt must never change an earlier protocol's identity.
+    from test_sequenced_jobs import _request_v3
+    from test_trade_accounting_jobs import _request_v4
+
+    from backtest_runtime.agent_access import checked_plan
+
+    factory = {1: _request_v2, 2: _request_v2, 3: _request_v3, 4: _request_v4}[version]
+    mapping = factory(tmp_path)
+    if version == 1:
+        mapping["schema_version"] = 1
+        mapping.pop("producer")
+        mapping.pop("research_clock")
+        mapping["evidence_tier"] = "diagnostic"
+    request = BacktestJobRequest.from_mapping(mapping)
+    assert request.request_sha256 == request_sha256
+    assert checked_plan(request, tmp_path, None)["plan_sha256"] == plan_sha256

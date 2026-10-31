@@ -61,7 +61,14 @@ def validate_request(
                 raise EngineValidationError(
                     "INTEGRITY_FAILURE", "Engine executable digest mismatch"
                 )
-            output, status = _invoke(source.fileno(), data)
+            deadline = time.monotonic() + TIMEOUT_SECONDS
+            advertisement, status = _invoke(
+                source.fileno(), b"", command="capabilities", deadline=deadline
+            )
+            _capabilities(advertisement, status)
+            output, status = _invoke(
+                source.fileno(), data, command="validate", deadline=deadline
+            )
     except OSError as error:
         raise _unavailable("Engine validator could not be launched") from error
     if status == 2 and not output:
@@ -73,11 +80,29 @@ def validate_request(
     return _receipt(output, input_sha256)
 
 
-def _receipt(output: bytes, digest: str) -> dict[str, Any]:
+def _json_response(output: bytes) -> Any:
     try:
-        value = json.loads(output, object_pairs_hook=_unique_object)
+        return json.loads(output, object_pairs_hook=_unique_object)
     except (ValueError, UnicodeError, RecursionError) as error:
         raise _unavailable("Engine validator returned malformed JSON") from error
+
+
+def _capabilities(output: bytes, status: int) -> None:
+    if status != 0:
+        raise _unavailable("Engine validator capabilities are unavailable")
+    value = _json_response(output)
+    if (
+        not isinstance(value, dict)
+        or value.get("schema_version") != "engine_capabilities.v1"
+        or value.get("request_schema") != "engine_request.v1"
+        or type(value.get("validator_version")) is not int
+        or value.get("validator_version") != 1
+    ):
+        raise _unavailable("Engine does not advertise a compatible validator")
+
+
+def _receipt(output: bytes, digest: str) -> dict[str, Any]:
+    value = _json_response(output)
     expected = {
         "schema_version": "engine_validation.v1",
         "request_schema": "engine_request.v1",
@@ -104,10 +129,12 @@ def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return value
 
 
-def _invoke(binary_fd: int, data: bytes) -> tuple[bytes, int]:
-    deadline = time.monotonic() + TIMEOUT_SECONDS
+def _invoke(
+    binary_fd: int, data: bytes, *, command: str, deadline: float
+) -> tuple[bytes, int]:
+    arguments = [command, "-"] if command == "validate" else ["capabilities"]
     with subprocess.Popen(
-        [f"/proc/self/fd/{binary_fd}", "validate", "-"],
+        [f"/proc/self/fd/{binary_fd}", *arguments],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
