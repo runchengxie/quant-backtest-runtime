@@ -30,10 +30,17 @@ def smoke(executable: Path, root: Path) -> None:
             subprocess.check_output([*command, *args], text=True, timeout=15)
         )
 
-    receipt = call("submit", str(request))
+    plan = call("plan", str(request))
+    receipt = call(
+        "submit", str(request), "--expected-plan-sha256", plan["plan_sha256"]
+    )
+    key = json.loads(request.read_text())["idempotency_key"]
+    recovered = call("lookup", "--idempotency-key", key)
+    if recovered["job_id"] != receipt["job_id"]:
+        raise ValueError("lost receipt lookup changed job identity")
     deadline = time.monotonic() + 90
     while True:
-        status = call("status", receipt["job_id"])
+        status = call("inspect", recovered["job_id"])
         if status["status"] in {"SUCCEEDED", "FAILED", "CANCELLED"}:
             break
         if time.monotonic() >= deadline:

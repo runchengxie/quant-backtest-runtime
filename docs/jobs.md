@@ -95,3 +95,40 @@ The worker publishes results to a task-specific directory and stores a manifest 
 v1 and v3 results contain five diagnostic tables. v2 contains the platform `portfolio_backtester.backtest_result.v1` result package. v4 contains a one-row cost table. A successful job means that its result has been published and validated; it does not promote a strategy. Research promotion still requires source review and human approval in the research layer.
 
 For v2's copied `QuantRunManifest`, `result` verifies the file hash, typed structure and research run ID. It does not reread component files from the external input store; those were checked at submission and worker validation. The research run ID and runtime job UUID are separate identities.
+
+## Agent access
+
+`backtest-job capabilities` requires no storage paths and returns
+`quant.agent_capabilities.v1`. The catalogue covers request v1–v5 and describes
+permissions, effects and retries. Discovery grants no authority.
+
+With the explicit storage options above, use `plan REQUEST` before execution.
+Its `quant.backtest_plan.v1` includes normalized request, content digests, declared
+resource ceilings and a deterministic `plan_sha256`. Submit using
+`submit REQUEST --expected-plan-sha256 DIGEST`. A mismatch fails before database
+creation or recovery. Plans exclude display paths and do not alter request
+fingerprints. Inputs are checked again during execution.
+
+Plans check request shape, all input hashes, root/component manifests and v5
+executable bytes. They do not check Parquet rows, clock/table consistency,
+resource enforcement, historical PIT, economic validity or promotion. The v5
+engine request's semantic validator is only available inside the engine; the
+plan explicitly reports `engine_request_semantics=not_checked` instead of
+executing it or duplicating its validator. A passed plan is not execution success.
+
+Use `inspect JOB_ID` for current state and `lookup --idempotency-key KEY` after
+losing a submission response. These open an existing database with SQLite
+`mode=ro`; they do not create a database, migrate, recover leases, signal processes
+or clean output. SQLite may use coordination sidecars for live WAL databases;
+this is an application read-only guarantee, not a filesystem-zero-write promise.
+Existing `status` still runs recovery. Existing `result` still verifies every
+published hash and retains its historical storage initialization behavior.
+
+Global `--error-format json` emits one `quant.agent_error.v1` object to stderr,
+with no success output on failure. Parse failures exit 2; domain failures exit 1.
+The error includes a stable code, conservative retry flag, suggested action and
+known job/key identities. Unknown internal failures omit raw diagnostics. Text
+mode retains legacy exceptions. Research approval is never implied by a job,
+plan, error suggestion or integrity check. Lost responses require lookup before
+retrying the identical request and key; use a new key only for a deliberate new
+execution.
