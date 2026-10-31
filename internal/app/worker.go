@@ -197,43 +197,82 @@ func worker(parent context.Context, o Options) error {
 		}
 		return e
 	}
-	if ctx.Err() != nil {
+	return publishResult(ctx, o, st, job.JobID, stage, digest, syncTree, syncDirectory)
+}
+
+// Files are durable before the success CAS. A failed or uncertain CAS must be
+// reconciled with persisted state before removing any published output.
+func publishResult(ctx context.Context, o Options, st *store.Store, id, stage, digest string, syncFiles, syncDir func(string) error) error {
+	final := filepath.Join(o.ResultRoot, id)
+	if _, e := os.Lstat(final); !os.IsNotExist(e) {
 		_ = os.RemoveAll(stage)
-		_, e = st.Finish(job.JobID, "FAILED", "", "", "WORKER_INTERRUPTED", ctx.Err().Error())
-		return e
-	}
-	final := filepath.Join(o.ResultRoot, job.JobID)
-	if _, e = os.Lstat(final); !os.IsNotExist(e) {
-		_ = os.RemoveAll(stage)
-		_, _ = st.Finish(job.JobID, "FAILED", "", "", "PUBLICATION_FAILED", "final directory already exists")
+		_, _ = st.Finish(id, "FAILED", "", "", "PUBLICATION_FAILED", "final directory already exists")
 		return failure("PUBLICATION_FAILED", "final directory already exists")
 	}
-	if e = syncTree(stage); e == nil {
+	attempted := false
+	e := ctx.Err()
+	if e == nil {
+		e = syncFiles(stage)
+	}
+	if e == nil {
+		e = ctx.Err()
+	}
+	if e == nil {
 		e = unix.Renameat2(unix.AT_FDCWD, stage, unix.AT_FDCWD, final, unix.RENAME_NOREPLACE)
 	}
 	if e == nil {
-		e = syncDirectory(o.ResultRoot)
+		e = syncDir(o.ResultRoot)
 	}
-	if e != nil {
+	if e == nil {
+		e = ctx.Err()
+	}
+	if e == nil {
+		attempted = true
+		var completed bool
+		completed, e = st.FinishContext(ctx, id, "SUCCEEDED", "backtest-job://"+id, digest, "", "")
+		if completed && e == nil {
+			return nil
+		}
+	}
+	current, readErr := st.Get(id)
+	if readErr != nil {
+		// The commit outcome is unknown; recovery must decide whether files are live.
+		return errors.Join(e, readErr)
+	}
+	if current.Status == "SUCCEEDED" {
+		return nil
+	}
+	if current.Status == "FAILED" || current.Status == "CANCELLED" {
 		_ = os.RemoveAll(stage)
 		_ = os.RemoveAll(final)
-		_, _ = st.Finish(job.JobID, "FAILED", "", "", "PUBLICATION_FAILED", e.Error())
+		_ = syncDir(o.ResultRoot)
 		return e
 	}
-	completed, e := st.Finish(job.JobID, "SUCCEEDED", "backtest-job://"+job.JobID, digest, "", "")
+	// Preserve output on storage errors unless cancellation/deadline establishes
+	// a terminal outcome that can be committed before cleanup.
+	status, code, message := "FAILED", "PUBLICATION_FAILED", "publication did not commit"
 	if e != nil {
+		message = e.Error()
+	}
+	if current.CancelRequestedAt != nil {
+		status, code = "CANCELLED", ""
+	} else if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		code = "JOB_TIMEOUT"
+	} else if ctx.Err() != nil {
+		code = "WORKER_INTERRUPTED"
+	} else if e != nil && attempted {
 		return e
 	}
-	if !completed {
-		_ = os.RemoveAll(final)
-		_ = syncDirectory(o.ResultRoot)
-		j, err := st.Get(job.JobID)
-		if err == nil && j.CancelRequestedAt != nil {
-			_, err = st.Finish(job.JobID, "CANCELLED", "", "", "", "")
-		}
-		return err
+	done, finishErr := st.Finish(id, status, "", "", code, message)
+	if finishErr != nil {
+		return errors.Join(e, finishErr)
 	}
-	return nil
+	if done {
+		_ = os.RemoveAll(stage)
+		_ = os.RemoveAll(final)
+		_ = syncDir(o.ResultRoot)
+	}
+	return e
 }
 
 func workerFailureCode(err error) string {

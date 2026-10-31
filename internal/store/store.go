@@ -2,6 +2,7 @@
 package store
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
@@ -173,6 +174,10 @@ func nullable(s string) any {
 	return s
 }
 func (s *Store) Finish(id, status, resultRef, digest, code, message string) (bool, error) {
+	return s.FinishContext(context.Background(), id, status, resultRef, digest, code, message)
+}
+
+func (s *Store) FinishContext(ctx context.Context, id, status, resultRef, digest, code, message string) (bool, error) {
 	condition := "status IN ('SUBMITTED','RUNNING')"
 	switch status {
 	case "SUCCEEDED":
@@ -188,7 +193,7 @@ func (s *Store) Finish(id, status, resultRef, digest, code, message string) (boo
 	if len(runes) > 2000 {
 		message = string(runes[:2000])
 	}
-	return changed(s.db.Exec(`UPDATE backtest_jobs SET status=?,updated_at=?,worker_pid=NULL,lease_expires_at=NULL,result_ref=?,result_sha256=?,error_code=?,error_message=? WHERE job_id=? AND `+condition, status, now(), nullable(resultRef), nullable(digest), nullable(code), nullable(message), id))
+	return changed(s.db.ExecContext(ctx, `UPDATE backtest_jobs SET status=?,updated_at=?,worker_pid=NULL,lease_expires_at=NULL,result_ref=?,result_sha256=?,error_code=?,error_message=? WHERE job_id=? AND `+condition, status, now(), nullable(resultRef), nullable(digest), nullable(code), nullable(message), id))
 }
 func (s *Store) Cancel(id string) (Job, error) {
 	t := now()
