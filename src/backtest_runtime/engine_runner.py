@@ -14,6 +14,7 @@ from typing import Any
 
 from .contracts import BacktestJobRequest
 from .engine_protocol import validate_engine_result
+from .engine_sessions_protocol import bind_session_request, validate_session_result
 from .jobs import BacktestJobService
 
 
@@ -37,7 +38,7 @@ def run_engine(
 ) -> dict[str, Any]:
     if executable is None or not executable.is_absolute():
         raise ValueError(
-            "v5 requires an operator-configured absolute engine executable"
+            "engine jobs require an operator-configured absolute executable"
         )
     binary = executable.resolve(strict=True)
     with binary.open("rb") as source:
@@ -86,5 +87,12 @@ def _run_verified(
             if stdout.tell() > 64 * 1024 * 1024:
                 raise ValueError("engine result exceeds 64 MiB")
             stdout.seek(0)
-            payload = validate_engine_result(json.load(stdout))
+            validator = (
+                validate_session_result
+                if request.schema_version == 6
+                else validate_engine_result
+            )
+            payload = validator(json.load(stdout))
+            if request.schema_version == 6:
+                bind_session_request(payload, json.loads(data))
     return payload

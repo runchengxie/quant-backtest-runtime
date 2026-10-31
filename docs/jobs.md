@@ -4,7 +4,7 @@
 
 ## Request protocol
 
-The runtime accepts four request versions. v1 and v2 use `native.position_replay`, v3 uses `native.sequenced_execution`, and v4 uses `native.trade_accounting`.
+The runtime accepts six request versions. v1 and v2 use `native.position_replay`, v3 uses `native.sequenced_execution`, v4 uses `native.trade_accounting`, v5 selects the independent engine v1 final snapshot, and v6 selects its v2 session ledger. See [engine integration](development.md#session-ledger-jobs-v6).
 
 | Version | Purpose | Required conditions | Result format |
 | --- | --- | --- | --- |
@@ -99,7 +99,7 @@ For v2's copied `QuantRunManifest`, `result` verifies the file hash, typed struc
 ## Agent access
 
 `backtest-job capabilities` requires no storage paths and returns
-`quant.agent_capabilities.v1`. The catalogue covers request v1–v5 and describes
+`quant.agent_capabilities.v1`. The catalogue covers request v1–v6 and describes
 permissions, effects and retries. Discovery grants no authority.
 
 With the explicit storage options above, use `plan REQUEST` before execution.

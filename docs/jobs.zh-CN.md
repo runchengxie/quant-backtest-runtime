@@ -109,7 +109,7 @@ v1 和 v3 结果包含五张诊断表。v2 结果包含平台的 `portfolio_back
 ## Agent 调用
 
 `backtest-job capabilities` 无需数据路径，返回带权限、副作用和重试说明的
-`quant.agent_capabilities.v1`，覆盖 v1–v5。能力发现本身不授予权限。
+`quant.agent_capabilities.v1`，覆盖 v1–v6。能力发现本身不授予权限。
 
 携带前文的存储参数调用 `plan REQUEST`，再用
 `submit REQUEST --expected-plan-sha256 DIGEST` 绑定计划。预检核验请求结构、输入哈希、

@@ -85,7 +85,7 @@ def capabilities() -> dict[str, Any]:
     return {
         "schema": "quant.agent_capabilities.v1",
         "owner": "quant-backtest-runtime",
-        "request_versions": [1, 2, 3, 4, 5],
+        "request_versions": [1, 2, 3, 4, 5, 6],
         "permission_grant": False,
         "operations": [
             {

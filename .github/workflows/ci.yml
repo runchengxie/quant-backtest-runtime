@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: runchengxie/quant-backtest-engine
-          ref: a2dc923b01c46389f090db7865175c5d87b6819c
+          ref: 3ee74bfa21d743e595ce61d0ac06b97dd588ebd6
           path: .engine-source
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
@@ -72,4 +72,4 @@ jobs:
       - name: Real Rust engine job and lifecycle checks
         env:
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
-        run: uv run --locked pytest -q tests/test_rust_engine_jobs.py
+        run: uv run --locked pytest -q tests/test_rust_engine_jobs.py tests/test_engine_sessions.py

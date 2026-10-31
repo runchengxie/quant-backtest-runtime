@@ -47,10 +47,10 @@ def build_plan(
     if request.quant_run_manifest_ref is not None:
         service.validate_quant_run_manifest(request)
     executable_sha256 = None
-    if request.schema_version == 5:
+    if request.schema_version in {5, 6}:
         if engine is None or not engine.is_absolute():
             raise AccessError(
-                "INVALID_REQUEST", "v5 requires an absolute engine executable"
+                "INVALID_REQUEST", "engine jobs require an absolute engine executable"
             )
         if not engine.is_file() or not os.access(engine, os.X_OK):
             raise AccessError("ENGINE_UNAVAILABLE", "Engine executable is unavailable")
@@ -75,7 +75,7 @@ def build_plan(
             else "not_applicable",
             "executable_hash": "passed" if executable_sha256 else "not_applicable",
             "engine_request_semantics": "not_checked"
-            if request.schema_version == 5
+            if request.schema_version in {5, 6}
             else "not_applicable",
             "parquet_rows": "not_checked",
             "clock_table_consistency": "not_checked",
