@@ -75,6 +75,7 @@ def _install(destination: Path, sha: str, implementation: str) -> None:
                 "go",
                 "build",
                 "-trimpath",
+                "-buildvcs=false",
                 "-mod=readonly",
                 "-ldflags",
                 f"-X github.com/runchengxie/quant-backtest-runtime/internal/app.SourceRevision={sha}",
