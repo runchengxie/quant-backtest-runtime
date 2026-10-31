@@ -19,10 +19,16 @@ def _sha256(path: Path) -> str:
 
 
 def read_job_result(
-    result_root: Path, *, job_id: str, manifest_sha256: str, request_sha256: str
+    result_root: Path,
+    *,
+    job_id: str,
+    manifest_sha256: str,
+    request_sha256: str,
+    result_directory: Path | None = None,
+    synchronous_parquet: bool = False,
 ) -> dict[str, Any]:
     """Reject altered Job or official bundle contents before returning a result."""
-    root = result_root / job_id
+    root = result_root / job_id if result_directory is None else result_directory
     manifest_path = root / "manifest.json"
     if root.is_symlink() or manifest_path.is_symlink() or not manifest_path.is_file():
         raise ValueError("result manifest is missing or unsafe")
@@ -51,7 +57,7 @@ def read_job_result(
 
         verify_engine_result(root, payload)
     elif schema == "quant.trade_accounting_result.v1":
-        _verify_trade_accounting(root, payload)
+        _verify_trade_accounting(root, payload, synchronous_parquet=synchronous_parquet)
     elif schema == "ticknet.backtest_job_result.v1":
         _verify_diagnostic_frames(root, payload)
     else:
@@ -59,7 +65,9 @@ def read_job_result(
     return payload
 
 
-def _verify_trade_accounting(root: Path, payload: dict[str, Any]) -> None:
+def _verify_trade_accounting(
+    root: Path, payload: dict[str, Any], *, synchronous_parquet: bool = False
+) -> None:
     if payload.get("backend") != "native.trade_accounting":
         raise ValueError("invalid trade accounting backend")
     inventory = payload.get("inventory")
@@ -86,7 +94,9 @@ def _verify_trade_accounting(root: Path, payload: dict[str, Any]) -> None:
         raise ValueError("invalid trade accounting summary")
     import pandas as pd
 
-    frame = pd.read_parquet(path)
+    # Keep Arrow Python-object cleanup within the live one-shot interpreter.
+    options = {"use_threads": False, "pre_buffer": False} if synchronous_parquet else {}
+    frame = pd.read_parquet(path, **options)
     if len(frame) != 1 or frame.iloc[0].to_dict() != summary:
         raise ValueError("trade accounting summary does not match verified frame")
 

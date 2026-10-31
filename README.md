@@ -2,11 +2,21 @@
 
 [中文 README](README.zh-CN.md)
 
+The Go implementation owns job state, worker supervision and durable publication. Native v5/v6 Rust engine jobs run without Python. Legacy v1–v4 financial computation uses an explicitly configured, stateless Python adapter.
+
+Build on Linux with Go 1.27.3. Choose an external output directory.
+
+```sh
+go build -trimpath -o /absolute/external/runtime/bin/backtest-job ./cmd/backtest-job
+```
+
+The [Go guide](docs/go-runtime.md) covers immediate submission, the bounded persistent queue and the optional legacy interpreter. Production cutover requires stopping the previous lifecycle owner and backing up its database. This migration does not switch production services or schedules.
+
 `quant-backtest-runtime` accepts submitted backtest jobs, validates requests, manages job state in SQLite, runs workers, and validates and publishes results. It does not run LLM agents.
 
 Within the Quant Research project family, [`quant-platform`](https://github.com/runchengxie/quant-platform) provides reusable backtest capabilities, the research layer owns strategies and promotion, and this repository owns generic job execution. See [Repository ownership](docs/ownership.md) for the boundaries.
 
-## Run the synthetic example
+## Python compatibility example
 
 Linux and `uv` are required. Package metadata requires Python 3.12 or newer; CI validates 3.12 and 3.13. Other Python versions are not covered by these jobs:
 
@@ -24,7 +34,7 @@ The example uses synthetic data in a temporary directory. It submits a job and v
 3. [Operations and troubleshooting](docs/operations.md): release directories, rollback, and common failures.
 4. [Repository ownership](docs/ownership.md): interfaces with the research and platform repositories.
 
-## Installation variants
+## Python compatibility installation
 
 The base package has no Python runtime dependencies. It supports v5/v6 Rust jobs,
 SQLite lifecycle management, engine result verification, and agent discovery and

@@ -1,0 +1,103 @@
+{
+  "schema_version": "engine_request.v2",
+  "currency": "CNY",
+  "price_basis": "raw",
+  "initial_cash": "10000",
+  "fee_bps": "10",
+  "enforce_t1": true,
+  "instruments": [
+    {
+      "symbol": "AAA",
+      "price_precision": 2,
+      "buy_lot": 100
+    }
+  ],
+  "required_capabilities": [
+    "session_ledger"
+  ],
+  "sessions": [
+    {
+      "session_date": "2025-01-02",
+      "open_ts_ns": 1735781400000000000,
+      "valuation_ts_ns": 1735781401000000000,
+      "quotes": [
+        {
+          "symbol": "AAA",
+          "ts_ns": 1735781400000000000,
+          "bid": "10",
+          "ask": "10",
+          "bid_size": "1000000",
+          "ask_size": "1000000",
+          "tradable": true,
+          "limit_up": false,
+          "limit_down": false
+        },
+        {
+          "symbol": "AAA",
+          "ts_ns": 1735781401000000000,
+          "bid": "11",
+          "ask": "11",
+          "bid_size": "1000000",
+          "ask_size": "1000000",
+          "tradable": true,
+          "limit_up": false,
+          "limit_down": false
+        }
+      ],
+      "orders": [
+        {
+          "id": "buy",
+          "symbol": "AAA",
+          "information_ts_ns": 1735781399999999999,
+          "side": "buy",
+          "quantity": "100"
+        },
+        {
+          "id": "same-day-sell",
+          "symbol": "AAA",
+          "information_ts_ns": 1735781400000000000,
+          "side": "sell",
+          "quantity": "100"
+        }
+      ]
+    },
+    {
+      "session_date": "2025-01-03",
+      "open_ts_ns": 1735867800000000000,
+      "valuation_ts_ns": 1735867801000000000,
+      "quotes": [
+        {
+          "symbol": "AAA",
+          "ts_ns": 1735867800000000000,
+          "bid": "12",
+          "ask": "12",
+          "bid_size": "1000000",
+          "ask_size": "1000000",
+          "tradable": true,
+          "limit_up": false,
+          "limit_down": false
+        },
+        {
+          "symbol": "AAA",
+          "ts_ns": 1735867801000000000,
+          "bid": "12",
+          "ask": "12",
+          "bid_size": "1000000",
+          "ask_size": "1000000",
+          "tradable": true,
+          "limit_up": false,
+          "limit_down": false
+        }
+      ],
+      "orders": [
+        {
+          "id": "next-day-sell",
+          "symbol": "AAA",
+          "information_ts_ns": 1735781401000000000,
+          "side": "sell",
+          "quantity": "100"
+        }
+      ]
+    }
+  ]
+}

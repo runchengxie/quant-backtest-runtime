@@ -1,5 +1,7 @@
 # 开发与检查
 
+Go 实现使用 Go 1.27.3，并锁定 `go.mod` 和 `go.sum`。需要运行 gofmt、`go vet ./...` 和 `go test -race ./...`，再按 [Go 使用指南](go-runtime.zh-CN.md)构建源码之外的 CLI，执行真实引擎集成测试。原来的 Python 检查继续保留。
+
 [English page](development.md)
 
 ## 本地检查

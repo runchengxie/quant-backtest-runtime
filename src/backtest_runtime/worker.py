@@ -12,7 +12,7 @@ import sys
 import tempfile
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from .durability import prepare_result_root, sync_directory, sync_result_tree
 from .jobs import BacktestJobRequest, BacktestJobService
@@ -20,6 +20,14 @@ from .legacy import LegacyDependencyUnavailable, require_legacy
 from .store import JobStore, RegistryConflict
 
 RESULT_SCHEMA = "ticknet.backtest_job_result.v1"
+
+
+class ArtifactService(Protocol):
+    """Read-only inputs needed by computation and staging."""
+
+    def resolve_artifact(self, reference: str) -> Path: ...
+
+    def validate_quant_run_manifest(self, request: BacktestJobRequest) -> Any: ...
 
 
 class JobCancelled(Exception):
@@ -41,14 +49,27 @@ def _apply_memory_limit(memory_mb: int) -> None:
         raise RuntimeError(message) from error
 
 
+def _parquet_read_options(synchronous: bool) -> dict[str, Any]:
+    # One-shot adapters must release Python-backed Arrow work before shutdown.
+    # A background destructor acquiring the GIL after finalization can deadlock.
+    return {"use_threads": False, "pre_buffer": False} if synchronous else {}
+
+
 def _run_native_backend(
-    request: BacktestJobRequest, service: BacktestJobService
+    request: BacktestJobRequest,
+    service: ArtifactService,
+    *,
+    synchronous_parquet: bool = False,
 ) -> Any:
     require_legacy()
     if request.schema_version == 4:
-        return _run_trade_accounting_backend(request, service)
+        return _run_trade_accounting_backend(
+            request, service, synchronous_parquet=synchronous_parquet
+        )
     if request.schema_version == 3:
-        return _run_sequenced_backend(request, service)
+        return _run_sequenced_backend(
+            request, service, synchronous_parquet=synchronous_parquet
+        )
     import pandas as pd
     from portfolio_backtester import PositionBacktestConfig
     from portfolio_backtester.backends import (
@@ -57,8 +78,9 @@ def _run_native_backend(
     )
     from portfolio_backtester.execution_sim import ExecutionSimConfig
 
+    parquet_options = _parquet_read_options(synchronous_parquet)
     inputs = {
-        name: pd.read_parquet(service.resolve_artifact(ref))
+        name: pd.read_parquet(service.resolve_artifact(ref), **parquet_options)
         for name, ref in request.inputs.items()
         if ref is not None
     }
@@ -90,7 +112,10 @@ def _run_native_backend(
 
 
 def _run_trade_accounting_backend(
-    request: BacktestJobRequest, service: BacktestJobService
+    request: BacktestJobRequest,
+    service: ArtifactService,
+    *,
+    synchronous_parquet: bool = False,
 ) -> Any:
     import pandas as pd
     from portfolio_backtester.backends.trade_accounting import (
@@ -101,7 +126,10 @@ def _run_trade_accounting_backend(
     reference = request.inputs["accounting_ref"]
     if reference is None:
         raise ValueError("accounting_ref must be an artifact reference")
-    frame = pd.read_parquet(service.resolve_artifact(reference))
+    frame = pd.read_parquet(
+        service.resolve_artifact(reference),
+        **_parquet_read_options(synchronous_parquet),
+    )
     accounting = compute_trade_accounting_frame(
         frame, TradeCostConfig(**request.config)
     )
@@ -119,7 +147,10 @@ def _run_trade_accounting_backend(
 
 
 def _run_sequenced_backend(
-    request: BacktestJobRequest, service: BacktestJobService
+    request: BacktestJobRequest,
+    service: ArtifactService,
+    *,
+    synchronous_parquet: bool = False,
 ) -> Any:
     import pandas as pd
     from portfolio_backtester.backends import (
@@ -136,8 +167,9 @@ def _run_sequenced_backend(
             raise ValueError(f"{name} must be an artifact reference")
         return service.resolve_artifact(reference)
 
-    positions = pd.read_parquet(resolve("positions_ref"))
-    pricing = pd.read_parquet(resolve("pricing_ref"))
+    parquet_options = _parquet_read_options(synchronous_parquet)
+    positions = pd.read_parquet(resolve("positions_ref"), **parquet_options)
+    pricing = pd.read_parquet(resolve("pricing_ref"), **parquet_options)
     clocks_path = resolve("decision_clocks_ref")
     if clocks_path.stat().st_size > 1024 * 1024:
         raise ValueError("decision clocks artifact exceeds 1 MiB")
@@ -255,8 +287,9 @@ def _write_result(
     *,
     job_id: str,
     request: BacktestJobRequest,
-    service: BacktestJobService,
+    service: ArtifactService,
     result_root: Path,
+    staging_only: bool = False,
 ) -> tuple[str, str]:
     prepare_result_root(result_root)
     final_dir = result_root / job_id
@@ -361,13 +394,28 @@ def _write_result(
             encoding="utf-8",
         )
         manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
-        sync_result_tree(tmp_dir)
-        tmp_dir.replace(final_dir)
-        sync_directory(result_root)
-        return f"backtest-job://{job_id}", manifest_sha256
+        return _finish_result_directory(
+            tmp_dir, final_dir, result_root, job_id, manifest_sha256, staging_only
+        )
     except BaseException:
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise
+
+
+def _finish_result_directory(
+    tmp_dir: Path,
+    final_dir: Path,
+    result_root: Path,
+    job_id: str,
+    digest: str,
+    staging_only: bool,
+) -> tuple[str, str]:
+    sync_result_tree(tmp_dir)
+    if staging_only:
+        return str(tmp_dir), digest
+    tmp_dir.replace(final_dir)
+    sync_directory(result_root)
+    return f"backtest-job://{job_id}", digest
 
 
 def _sha256_file(path: Path) -> str:

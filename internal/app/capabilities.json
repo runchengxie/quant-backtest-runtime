@@ -1,0 +1,348 @@
+{
+  "schema": "quant.agent_capabilities.v1",
+  "owner": "quant-backtest-runtime",
+  "request_versions": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "permission_grant": false,
+  "operations": [
+    {
+      "id": "capabilities",
+      "description": "Describe available contracts",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [],
+      "permission": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] capabilities",
+      "preconditions": [],
+      "retry": "read_again",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results capabilities"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "plan",
+      "description": "Validate immutable inputs and declare unchecked conditions",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [],
+      "permission": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "quant.backtest_plan.v1",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] plan",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "read_again",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results plan /tmp/synthetic/request.json"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "submit",
+      "description": "Submit once with an idempotency key; optionally bind a plan",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [
+        "recovery",
+        "job_insert",
+        "worker_execution"
+      ],
+      "permission": "submit",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] submit",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "same_request_and_key_after_lookup",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results submit /tmp/synthetic/request.json --expected-plan-sha256 <plan-sha256>"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "inspect",
+      "description": "Read current state without recovery",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [],
+      "permission": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] inspect",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "read_again",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results inspect <job-id>"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "lookup",
+      "description": "Resolve a lost receipt by idempotency key without recovery",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [],
+      "permission": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "idempotency_key": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "idempotency_key"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] lookup",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "read_again",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results lookup --idempotency-key synthetic-v2"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "status",
+      "description": "Read state after recovering expired leases",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [
+        "recovery"
+      ],
+      "permission": "recover",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] status",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "inspect_state_first",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results status <job-id>"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "cancel",
+      "description": "Request cancellation and signal a matching worker",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [
+        "cancel_request",
+        "process_signal"
+      ],
+      "permission": "cancel",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] cancel",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "inspect_state_first",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results cancel <job-id>"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "result",
+      "description": "Verify manifest and result-file integrity; no promotion",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [
+        "storage_initialization"
+      ],
+      "permission": "read",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] result",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "inspect_state_first",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results result <job-id>"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    },
+    {
+      "id": "recover",
+      "description": "Expire leases and remove unpublished output",
+      "owner": "quant-backtest-runtime",
+      "contract_version": 1,
+      "side_effects": [
+        "recovery",
+        "process_signal",
+        "output_cleanup"
+      ],
+      "permission": "recover",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object"
+      },
+      "output_contract": "object",
+      "invocation": "backtest-job [--database DB --artifact-root INPUTS --result-root RESULTS] recover",
+      "preconditions": [
+        "explicit storage paths",
+        "authorized local account"
+      ],
+      "retry": "inspect_state_first",
+      "examples": [
+        "backtest-job --database /tmp/synthetic/jobs.sqlite --artifact-root /tmp/synthetic/artifacts --result-root /tmp/synthetic/results recover"
+      ],
+      "limitations": [
+        "Discovery grants no permission",
+        "Success does not approve research"
+      ]
+    }
+  ]
+}

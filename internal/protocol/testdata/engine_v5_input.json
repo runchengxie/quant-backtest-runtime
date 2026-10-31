@@ -1,0 +1,48 @@
+{
+  "schema_version": "engine_request.v1",
+  "initial_cash": "10000.00",
+  "fee_bps": "10",
+  "instruments": [
+    {
+      "symbol": "AAA",
+      "price_precision": 2
+    }
+  ],
+  "quotes": [
+    {
+      "symbol": "AAA",
+      "ts_ns": 1735689600000000000,
+      "bid": "10.00",
+      "ask": "10.00"
+    },
+    {
+      "symbol": "AAA",
+      "ts_ns": 1735689601000000000,
+      "bid": "12.00",
+      "ask": "12.00"
+    },
+    {
+      "symbol": "AAA",
+      "ts_ns": 1735689602000000000,
+      "bid": "11.00",
+      "ask": "11.00"
+    }
+  ],
+  "orders": [
+    {
+      "id": "buy-1",
+      "symbol": "AAA",
+      "information_ts_ns": 1735689599999999999,
+      "side": "buy",
+      "quantity": "10"
+    },
+    {
+      "id": "sell-1",
+      "symbol": "AAA",
+      "information_ts_ns": 1735689600000000000,
+      "side": "sell",
+      "quantity": "10"
+    }
+  ],
+  "required_capabilities": []
+}
