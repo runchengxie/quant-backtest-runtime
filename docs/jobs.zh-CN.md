@@ -105,3 +105,24 @@ flowchart LR
 v1 和 v3 结果包含五张诊断表。v2 结果包含平台的 `portfolio_backtester.backtest_result.v1` 标准结果包。v4 结果包含单行成本表。`result` 会校验任务身份、请求指纹、清单哈希和结果文件哈希，再返回元数据。发现文件被修改时会报错。
 
 回测任务成功表示结果已完成发布并校验。v2 提供 `quant_run_manifest_ref` 时，`result` 会校验复制文件的哈希、typed 结构及研究运行 ID，不会重新读取外部输入库中的组件文件；组件文件在提交和 worker 校验时检查。研究运行 ID 与运行时任务 UUID 是不同身份。研究晋升仍需要研究侧完成来源核对和人工审批；运行时不会自动晋升策略。
+
+## Agent 调用
+
+`backtest-job capabilities` 无需数据路径，返回带权限、副作用和重试说明的
+`quant.agent_capabilities.v1`，覆盖 v1–v5。能力发现本身不授予权限。
+
+携带前文的存储参数调用 `plan REQUEST`，再用
+`submit REQUEST --expected-plan-sha256 DIGEST` 绑定计划。预检核验请求结构、输入哈希、
+根清单和组件以及 v5 可执行文件摘要；计划变化会在建库或恢复前失败。资源字段是上限，
+不是耗时估计。预检不会运行引擎，也不验证 Parquet 行、时钟与表内容、资源限制、历史 PIT、
+经济有效性或晋升。v5 请求语义只有引擎内的权威校验器能够验证，因此明确返回
+`engine_request_semantics=not_checked`。Worker 仍重新校验输入。
+
+`inspect JOB_ID` 和 `lookup --idempotency-key KEY` 以 SQLite `mode=ro` 读取已有库，
+不建库、迁移、恢复租约、清理输出或发送进程信号。活动 WAL 可能使用 SQLite 协调文件，
+所以这里承诺应用只读，而非文件系统零写入。旧 `status` 仍会执行恢复；旧 `result` 保留
+存储初始化行为并验证发布文件哈希。提交响应丢失后先 lookup，再决定是否用相同请求和键重试。
+
+全局 `--error-format json` 在 stderr 输出单条 `quant.agent_error.v1`，失败时 stdout
+为空。参数错误退出 2，领域错误退出 1；错误带稳定代码、保守的重试标记、建议和已知任务身份。
+内部错误不泄露原始异常。默认文本模式保持原行为。计划通过、任务成功和完整性核验都不等于研究晋升。

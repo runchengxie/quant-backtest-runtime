@@ -19,12 +19,21 @@ def _utc_now() -> str:
 
 
 class JobStore:
-    def __init__(self, database_path: str | Path) -> None:
+    def __init__(self, database_path: str | Path, *, read_only: bool = False) -> None:
         self.database_path = Path(database_path).expanduser().resolve()
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self._connection = sqlite3.connect(str(self.database_path))
+        if read_only:
+            if not self.database_path.is_file():
+                raise FileNotFoundError("Existing job database is required")
+            self._connection = sqlite3.connect(
+                self.database_path.as_uri() + "?mode=ro", uri=True
+            )
+        else:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+            self._connection = sqlite3.connect(str(self.database_path))
         self._connection.row_factory = sqlite3.Row
         self._connection.execute("PRAGMA busy_timeout = 5000")
+        if read_only:
+            return
         self._connection.executescript("""
             CREATE TABLE IF NOT EXISTS backtest_jobs (
                 job_id TEXT PRIMARY KEY,
