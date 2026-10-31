@@ -7,7 +7,10 @@ name = "quant-backtest-runtime"
 version = "0.1.0"
 description = "Independent durable backtest job runtime"
 requires-python = ">=3.12"
-dependencies = ["quant-platform>=0.0.1"]
+dependencies = []
+
+[project.optional-dependencies]
+legacy = ["quant-platform @ git+https://github.com/runchengxie/quant-platform.git@15ec62b66e894395d694049eaaace931de4a1265"]
 
 [project.scripts]
 backtest-job = "backtest_runtime.cli:main"
@@ -22,9 +25,6 @@ dev = [
     "ty>=0.0.84",
 ]
 docs = ["mkdocs-material>=9.6,<10"]
-
-[tool.uv.sources]
-quant-platform = { git = "https://github.com/runchengxie/quant-platform.git", rev = "15ec62b66e894395d694049eaaace931de4a1265" }
 
 [tool.setuptools.packages.find]
 where = ["src"]

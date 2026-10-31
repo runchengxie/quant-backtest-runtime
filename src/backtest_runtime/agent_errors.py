@@ -9,6 +9,7 @@ import sys
 from typing import Any, Never
 
 from .agent_access import AccessError
+from .legacy import LegacyDependencyUnavailable
 from .store import RegistryConflict
 
 
@@ -43,7 +44,7 @@ def emit_error(error: Exception, args: Any = None) -> int:
 
 
 def classify(error: Exception) -> tuple[str, str]:
-    if isinstance(error, AccessError):
+    if isinstance(error, (AccessError, LegacyDependencyUnavailable)):
         return error.code, str(error)
     if isinstance(error, ArgumentFailure):
         return "INVALID_ARGUMENTS", "Invalid command arguments; consult --help"

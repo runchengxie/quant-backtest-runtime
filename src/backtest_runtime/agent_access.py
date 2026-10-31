@@ -13,6 +13,7 @@ from typing import Any
 from .contracts import BacktestJobRequest
 from .engine_validation import EngineValidationError, validate_request
 from .jobs import BacktestJobService
+from .legacy import require_request_dependencies
 
 
 class AccessError(ValueError):
@@ -38,6 +39,7 @@ def build_plan(
 ) -> dict[str, Any]:
     if not sys.platform.startswith("linux"):
         raise AccessError("PLATFORM_UNAVAILABLE", "Local execution requires Linux")
+    require_request_dependencies(request.schema_version, request.quant_run_manifest_ref)
     # Artifact checks do not need a store; this is deliberately not a JobStore.
     service = ArtifactReader(artifact_root)
     inputs = {}

@@ -11,8 +11,8 @@
 需要 Linux 和 `uv`。包声明要求 Python 3.12 或更新版本，CI 验证 3.12、3.13，不覆盖其他 Python 版本。在仓库根目录执行：
 
 ```bash
-uv sync --locked --group dev --python 3.13
-uv run --locked python scripts/smoke_backtest.py
+uv sync --locked --extra legacy --group dev --python 3.13
+uv run --locked --extra legacy python scripts/smoke_backtest.py
 ```
 
 示例只使用虚构数据，在临时目录中提交任务并检查结果，不需要真实研究数据。
@@ -29,3 +29,33 @@ uv run --locked python scripts/smoke_backtest.py
 2. [开发与检查](development.md)：本地环境、质量检查和测试范围。
 3. [发布与故障排查](operations.md)：发布目录、回滚与常见错误。
 4. [仓库职责](ownership.md)：与研究侧及平台侧的接口边界。
+
+## 安装方式
+
+基础包没有 Python 运行时依赖，支持 v5/v6 Rust 任务、SQLite 生命周期管理、
+引擎结果校验，以及 agent 能力查询和预检。请单独安装经过审查的引擎可执行文件，
+通过 `--engine-executable` 传入绝对路径：
+
+```sh
+pip install quant-backtest-runtime
+# 仓库内安装锁定的开发工具，不安装旧 Python 后端：
+uv sync --locked --group dev
+```
+
+v1-v4 执行、旧结果读取和 `quant_run_manifest_ref` 校验需要显式安装兼容扩展：
+
+```sh
+pip install 'quant-backtest-runtime[legacy]'
+uv sync --locked --extra legacy --group dev
+```
+
+该扩展将 quant-platform 固定到经过审查的 Git 提交，需要 Git 访问权限。
+`dev` 依赖组不会自动启用它。缺少依赖时返回 `LEGACY_DEPENDENCY_UNAVAILABLE`
+和安装提示；CLI 的 plan 和 submit 会在创建状态之前拒绝请求。
+依赖预检只检查包是否存在，不导入 pandas 或组合回测代码，也不证明后端兼容性或
+请求语义正确。v1-v6 请求指纹、计划内容和持久化状态协议保持不变。
+v6 计划仍将引擎语义标为 `not_checked`，v5 使用引擎提供的静态校验。
+
+此次改动只拆分安装依赖，没有将 Python 算法迁入 Rust。在调用方和暂不支持的场景
+完成迁移前，请保留 legacy 扩展。runtime 继续通过自身引擎协议负责进程监管、
+SQLite 状态和结果发布校验，不使用提供方 SDK 监管子进程。

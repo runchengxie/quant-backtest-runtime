@@ -14,6 +14,7 @@ from .agent_access import AccessError, checked_plan, load_request
 from .agent_errors import AgentParser, emit_error
 from .capabilities import capabilities
 from .jobs import BacktestJobRequest, BacktestJobService
+from .legacy import require_request_dependencies
 from .results import read_job_result
 from .store import JobStore
 
@@ -104,6 +105,10 @@ def _run(args: argparse.Namespace) -> dict:
             load_request(args.manifest), args.artifact_root, args.engine_executable
         )
     request = load_request(args.manifest) if args.command == "submit" else None
+    if request is not None:
+        require_request_dependencies(
+            request.schema_version, request.quant_run_manifest_ref
+        )
     if request is not None and args.expected_plan_sha256 is not None:
         plan = checked_plan(request, args.artifact_root, args.engine_executable)
         if plan["plan_sha256"] != args.expected_plan_sha256:

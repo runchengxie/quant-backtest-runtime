@@ -16,6 +16,7 @@ from typing import Any
 
 from .durability import prepare_result_root, sync_directory, sync_result_tree
 from .jobs import BacktestJobRequest, BacktestJobService
+from .legacy import LegacyDependencyUnavailable, require_legacy
 from .store import JobStore, RegistryConflict
 
 RESULT_SCHEMA = "ticknet.backtest_job_result.v1"
@@ -43,6 +44,7 @@ def _apply_memory_limit(memory_mb: int) -> None:
 def _run_native_backend(
     request: BacktestJobRequest, service: BacktestJobService
 ) -> Any:
+    require_legacy()
     if request.schema_version == 4:
         return _run_trade_accounting_backend(request, service)
     if request.schema_version == 3:
@@ -400,6 +402,9 @@ def execute_job(
         try:
             mapping = json.loads(row["request_json"])
             request = BacktestJobRequest.from_mapping(mapping)
+        except LegacyDependencyUnavailable as error:
+            service.fail_submitted(job_id, code=error.code, message=str(error))
+            return 1
         except (json.JSONDecodeError, TypeError, ValueError) as error:
             service.fail_submitted(
                 job_id,
@@ -554,6 +559,8 @@ def _handle_failure(
 
 
 def _error_code(error: Exception) -> str:
+    if isinstance(error, LegacyDependencyUnavailable):
+        return error.code
     if isinstance(error, FileNotFoundError):
         return "INPUT_ARTIFACT_MISSING"
     if isinstance(error, ValueError) and "CAPABILITY_MISMATCH" in str(error):

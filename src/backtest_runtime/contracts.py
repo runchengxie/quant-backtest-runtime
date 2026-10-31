@@ -477,6 +477,9 @@ class BacktestJobRequest:
         if "quant_run_manifest_ref" in mapping:
             manifest_ref = f"artifact://sha256/{artifact_digest(mapping['quant_run_manifest_ref'], label='quant_run_manifest_ref')}"
         if version == 2:
+            from .legacy import require_legacy
+
+            require_legacy()
             from research_contracts import ProducerIdentity, validate_research_clock
 
             if not execution["ledger"]:
