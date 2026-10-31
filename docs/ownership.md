@@ -16,4 +16,6 @@ The research-side `scripts/dev/check_legacy_backtest_jobs.py` checks whether the
 
 Plans for extracting this runtime from the platform repository are migration history. Current runtime behavior is documented here. Cross-repository callers should link to these contracts instead of maintaining duplicate task and deployment procedures.
 
-The runtime uses the base dependency set from `quant-platform`. Model training, cross-validation, and technical indicators are optional platform capabilities and are not installed by this runtime.
+The base runtime requires Python but no third-party Python packages. Install the explicit `legacy` extra for the older quant-platform backends. Model training remains a caller responsibility.
+
+The [runtime language record](runtime-language.md) describes the proposed Go evaluation and the compatibility checks required before a migration.
