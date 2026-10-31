@@ -57,7 +57,7 @@ It does not change v1–v4 normalization or fingerprints. It currently provides 
 **diagnostic final snapshot**, not the execution-aware daily ledger of v2.
 
 Install/build the engine from a reviewed, merged revision outside task worktrees.
-Dedicated CI pins provider `3ee74bfa21d743e595ce61d0ac06b97dd588ebd6` and tests the real binary with this
+Dedicated CI pins provider `341de0177bc3e6b95ff8b4abb8c80c83eaedf207` and tests the real binary with this
 consumer revision; local validation uses that provider's identical tested sources.
 Pass the absolute executable using the operator CLI option `--engine-executable`.
 The submitted request cannot select an arbitrary executable path or shell command.
@@ -88,6 +88,25 @@ atomic replacement; do not modify an executable inode in place during a job.
 ```sh
 backtest-job --database /data/jobs.sqlite --artifact-root /data/artifacts   --result-root /data/results --engine-executable /releases/engine/quant-backtest-engine   submit /data/job-v5.json
 ```
+
+Agent `plan` and plan-bound `submit` perform owner-authoritative static v5
+validation before opening the job database. The runtime reads at most 1 MiB plus
+one byte, verifies the input digest, and sends those exact bytes to the pinned
+engine's `validate -` command through a held executable descriptor. First it
+checks `capabilities` through that same descriptor and requires validator version 1.
+The two child operations share one 10-second deadline, use a minimal environment
+and each have independently enforced 8-KiB
+stdout/stderr limits; overflow or timeout kills and reaps it. This operation creates
+no job state or temporary output files and never runs a simulation.
+
+A successful v5 plan marks `engine_request_semantics` as `passed` and binds the
+strict `engine_validation.v1` receipt (validator version 1 and exact input SHA-256)
+into `plan_sha256`. Invalid requests produce `ENGINE_REQUEST_INVALID`; an older or
+unsupported validator, malformed receipt, process failure or resource limit gives
+`ENGINE_VALIDATION_UNAVAILABLE`. Install a compatible immutable engine release;
+there is no fallback to unchecked v5 plans. v1–v4 plan digests and all request
+fingerprints keep their existing contracts. The worker still verifies the original
+binary/input digests and the engine validates again at execution time.
 
 The Python worker remains the sole SQLite writer and result publisher. The Rust child
 inherits its address-space limit; timeout/cancellation kills and reaps the child.
@@ -132,7 +151,7 @@ coverage, requested orders and their information/valuation clocks.
 
 Example: change the v5 job wrapper to `schema_version: 6` and
 `backend: nautilus.session_replay`, and point `engine_request_ref` at the engine's
-[session fixture](https://github.com/runchengxie/quant-backtest-engine/blob/3ee74bfa21d743e595ce61d0ac06b97dd588ebd6/fixtures/sessions.json).
+[session fixture](https://github.com/runchengxie/quant-backtest-engine/blob/341de0177bc3e6b95ff8b4abb8c80c83eaedf207/fixtures/sessions.json).
 The synthetic result has first-day cash 8999/NAV 10099, a same-day T+1 denial, and
 final cash/NAV 10197.8. The runtime summary retains the common cash/positions/equity/
 commission keys, while the inventory JSON retains the complete session ledger.
@@ -142,4 +161,4 @@ full research clock, producer and canonical execution-aware mapping. Corporate a
 receivables, delisting policies, daily-volume participation and exchange-specific tax
 schedules are not inferred. Keep the existing Python backend for unsupported scenarios.
 Dedicated CI tests both v5 and v6 against merged provider
-`3ee74bfa21d743e595ce61d0ac06b97dd588ebd6`.
+`341de0177bc3e6b95ff8b4abb8c80c83eaedf207`.
