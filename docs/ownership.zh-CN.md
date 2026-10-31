@@ -16,4 +16,6 @@
 
 平台仓库中与运行时拆分有关的架构设计和实施计划保留为迁移历史，当前运行方法以本仓库文档为准。跨仓调用方通过链接引用说明，避免维护多份任务协议和部署步骤。
 
-运行时使用 `quant-platform` 的基础依赖集，模型训练、交叉验证和技术指标所需的 XGBoost、scikit-learn、pandas-ta 由平台的 `ml` 可选安装组提供。研究调用方按需声明 `quant-platform[ml]`。本仓库的回测不安装这些包及其专用计算库。
+基础 runtime 需要 Python 解释器，无需第三方 Python 包。使用旧 quant-platform 后端时，需要显式安装 `legacy` 可选安装组。模型训练由调用方安排。
+
+[Runtime 的语言方向](runtime-language.zh-CN.md)说明后续如何评估 Go，以及迁移前需要通过哪些兼容检查。
