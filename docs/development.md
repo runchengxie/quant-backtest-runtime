@@ -57,7 +57,7 @@ It does not change v1–v4 normalization or fingerprints. It currently provides 
 **diagnostic final snapshot**, not the execution-aware daily ledger of v2.
 
 Install/build the engine from a reviewed, merged revision outside task worktrees.
-Dedicated CI pins provider `3ee74bfa21d743e595ce61d0ac06b97dd588ebd6` and tests the real binary with this
+Dedicated CI pins provider `341de0177bc3e6b95ff8b4abb8c80c83eaedf207` and tests the real binary with this
 consumer revision; local validation uses that provider's identical tested sources.
 Pass the absolute executable using the operator CLI option `--engine-executable`.
 The submitted request cannot select an arbitrary executable path or shell command.
@@ -151,7 +151,7 @@ coverage, requested orders and their information/valuation clocks.
 
 Example: change the v5 job wrapper to `schema_version: 6` and
 `backend: nautilus.session_replay`, and point `engine_request_ref` at the engine's
-[session fixture](https://github.com/runchengxie/quant-backtest-engine/blob/3ee74bfa21d743e595ce61d0ac06b97dd588ebd6/fixtures/sessions.json).
+[session fixture](https://github.com/runchengxie/quant-backtest-engine/blob/341de0177bc3e6b95ff8b4abb8c80c83eaedf207/fixtures/sessions.json).
 The synthetic result has first-day cash 8999/NAV 10099, a same-day T+1 denial, and
 final cash/NAV 10197.8. The runtime summary retains the common cash/positions/equity/
 commission keys, while the inventory JSON retains the complete session ledger.
@@ -161,4 +161,4 @@ full research clock, producer and canonical execution-aware mapping. Corporate a
 receivables, delisting policies, daily-volume participation and exchange-specific tax
 schedules are not inferred. Keep the existing Python backend for unsupported scenarios.
 Dedicated CI tests both v5 and v6 against merged provider
-`3ee74bfa21d743e595ce61d0ac06b97dd588ebd6`.
+`341de0177bc3e6b95ff8b4abb8c80c83eaedf207`.

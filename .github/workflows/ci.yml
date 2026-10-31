@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: runchengxie/quant-backtest-engine
-          ref: 3ee74bfa21d743e595ce61d0ac06b97dd588ebd6
+          ref: 341de0177bc3e6b95ff8b4abb8c80c83eaedf207
           path: .engine-source
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
