@@ -103,8 +103,8 @@ def artifact_digest(value: Any, *, label: str) -> str:
 
 def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
     version = mapping["schema_version"]
-    if type(version) is not int or version not in {1, 2, 3, 4, 5}:
-        raise ValueError("schema_version must be integer 1, 2, 3, 4 or 5")
+    if type(version) is not int or version not in {1, 2, 3, 4, 5, 6}:
+        raise ValueError("schema_version must be integer 1, 2, 3, 4, 5 or 6")
     key = mapping["idempotency_key"]
     if not isinstance(key, str) or not _IDEMPOTENCY_KEY.fullmatch(key):
         raise ValueError("idempotency_key must be 1-128 safe ASCII characters")
@@ -112,6 +112,7 @@ def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
         3: "native.sequenced_execution",
         4: "native.trade_accounting",
         5: "nautilus.quote_market_orders",
+        6: "nautilus.session_replay",
     }.get(version, "native.position_replay")
     if mapping["backend"] != backend:
         raise ValueError(f"backend must be {backend} in v{version}")
@@ -122,7 +123,7 @@ def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
 
 
 def _validate_inputs(value: Any, *, version: int) -> dict[str, str]:
-    if version == 5:
+    if version in {5, 6}:
         inputs = _exact_keys(value, {"engine_request_ref"}, label="engine inputs")
         return {
             "engine_request_ref": f"artifact://sha256/{artifact_digest(inputs['engine_request_ref'], label='engine_request_ref')}"
@@ -396,7 +397,7 @@ def _validate_accounting_config(
 def _validate_backend_config(
     mapping: dict[str, Any], version: int
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    if version == 5:
+    if version in {5, 6}:
         config = _exact_keys(mapping["config"], {"executable_sha256"}, label="config")
         digest = config["executable_sha256"]
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
