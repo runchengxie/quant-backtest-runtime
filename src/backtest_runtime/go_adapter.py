@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from .agent_access import ArtifactReader, checked_plan
+from .agent_access import AccessError, ArtifactReader, checked_plan
 from .agent_errors import emit_error
 from .contracts import BacktestJobRequest
 from .legacy import require_request_dependencies
 from .results import read_job_result
-from .worker import _run_native_backend, _write_result
+from .worker import _error_code, _run_native_backend, _write_result
 
 
 def normalize(mapping: dict[str, Any]) -> dict[str, str]:
@@ -95,4 +96,10 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as error:
+        if sys.argv[1:2] == ["stage"]:
+            error = AccessError(_error_code(error), str(error)[:2000])
+        elif sys.argv[1:2] == ["verify"]:
+            error = AccessError(
+                "INTEGRITY_FAILURE", "Result integrity verification failed"
+            )
         raise SystemExit(emit_error(error)) from error

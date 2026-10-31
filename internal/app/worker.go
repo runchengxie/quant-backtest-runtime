@@ -74,7 +74,7 @@ func startWorker(o Options, st *store.Store, id string) (*exec.Cmd, error) {
 	return cmd, nil
 }
 
-func requestForJob(ctx context.Context, o Options, j store.Job) (*protocol.Request, error) {
+func persistedEnvelope(j store.Job) (*protocol.Request, error) {
 	if hash([]byte(j.RequestJSON)) != j.RequestSHA256 {
 		return nil, failure("REQUEST_HASH_MISMATCH", "persisted request digest mismatch")
 	}
@@ -91,6 +91,17 @@ func requestForJob(ctx context.Context, o Options, j store.Job) (*protocol.Reque
 			return nil, failure("REQUEST_HASH_MISMATCH", "persisted native canonical hash changed")
 		}
 		return native, nil
+	}
+	return r, nil
+}
+
+func requestForJob(ctx context.Context, o Options, j store.Job) (*protocol.Request, error) {
+	r, e := persistedEnvelope(j)
+	if e != nil {
+		return nil, e
+	}
+	if r.SchemaVersion >= 5 {
+		return r, nil
 	}
 	receipt, e := legacyCall(ctx, o, "normalize", []byte(j.RequestJSON))
 	if e != nil {
@@ -115,16 +126,13 @@ func worker(parent context.Context, o Options) error {
 	if e != nil {
 		return e
 	}
-	r, e := requestForJob(parent, o, job)
+	if job.Status != "SUBMITTED" {
+		return nil
+	}
+	r, e := persistedEnvelope(job)
 	if e != nil {
 		_, _ = st.Finish(job.JobID, "FAILED", "", "", "INVALID_PERSISTED_REQUEST", e.Error())
 		return e
-	}
-	if _, has := r.Mapping["quant_run_manifest_ref"]; has {
-		if _, e = buildPlan(parent, o, r); e != nil {
-			_, _ = st.Finish(job.JobID, "FAILED", "", "", "INTEGRITY_FAILURE", e.Error())
-			return e
-		}
 	}
 	claimed, e := st.Claim(job.JobID, os.Getpid(), float64(r.Budgets.WallSeconds+30))
 	if e != nil || !claimed {
@@ -152,7 +160,19 @@ func worker(parent context.Context, o Options) error {
 			}
 		}
 	}()
-	stage, digest, e := execute(ctx, o, job.JobID, r)
+	// Claim before loading optional Python contracts so startup is cancellable
+	// and visible to a restarted scheduler's resource accounting.
+	var stage, digest string
+	r, e = requestForJob(ctx, o, job)
+	startupFailure := e != nil
+	if e == nil {
+		if _, has := r.Mapping["quant_run_manifest_ref"]; has {
+			_, e = buildPlan(ctx, o, r)
+		}
+	}
+	if e == nil {
+		stage, digest, e = execute(ctx, o, job.JobID, r)
+	}
 	current, readErr := st.Get(job.JobID)
 	if readErr != nil {
 		return readErr
@@ -164,9 +184,12 @@ func worker(parent context.Context, o Options) error {
 	}
 	if e != nil {
 		removeOutput(o, job.JobID)
-		code := "WORKER_FAILED"
+		code := workerFailureCode(e)
+		if startupFailure && code != "LEGACY_DEPENDENCY_UNAVAILABLE" && code != "REQUEST_HASH_MISMATCH" {
+			code = "INVALID_PERSISTED_REQUEST"
+		}
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			code = "WALL_TIMEOUT"
+			code = "JOB_TIMEOUT"
 		}
 		_, finishErr := st.Finish(job.JobID, "FAILED", "", "", code, e.Error())
 		if finishErr != nil {
@@ -211,6 +234,24 @@ func worker(parent context.Context, o Options) error {
 		return err
 	}
 	return nil
+}
+
+func workerFailureCode(err error) string {
+	var typed *Error
+	if errors.As(err, &typed) {
+		switch typed.Code {
+		case "LEGACY_DEPENDENCY_UNAVAILABLE", "CAPABILITY_MISMATCH", "RESOURCE_LIMIT_UNAVAILABLE", "REQUEST_HASH_MISMATCH", "INPUT_ARTIFACT_MISSING", "BACKTEST_REJECTED", "BACKEND_EXECUTION_FAILED":
+			return typed.Code
+		case "INPUT_UNAVAILABLE":
+			return "INPUT_ARTIFACT_MISSING"
+		case "INVALID_REQUEST", "ENGINE_REQUEST_INVALID", "INTEGRITY_FAILURE":
+			return "BACKTEST_REJECTED"
+		}
+	}
+	if errors.Is(err, os.ErrNotExist) {
+		return "INPUT_ARTIFACT_MISSING"
+	}
+	return "BACKEND_EXECUTION_FAILED"
 }
 
 func execute(ctx context.Context, o Options, id string, r *protocol.Request) (string, string, error) {

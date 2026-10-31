@@ -11,9 +11,10 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
+import pandas as pd
 import pytest
 from test_engine_sessions import _session_request
-from test_execution_aware import _request_v2
+from test_execution_aware import _put_frame, _request_v2
 from test_rust_engine_jobs import _put, _request
 from test_sequenced_jobs import _request_v3
 from test_trade_accounting_jobs import _request_v4
@@ -160,6 +161,17 @@ def test_go_legacy_plan_hash_and_python_readable_result(
     assert runtime.call("result", receipt["job_id"]) == manifest
 
 
+def test_go_legacy_backend_rejection_keeps_failure_code(runtime: Runtime) -> None:
+    mapping = _request_v4(runtime.artifacts)
+    mapping["inputs"]["accounting_ref"] = _put_frame(
+        runtime.artifacts, pd.DataFrame({"unexpected_column": [1.0]})
+    )
+    receipt = runtime.call("submit", str(runtime.write(mapping)))
+    status = runtime.wait(receipt["job_id"])
+    assert status["status"] == "FAILED"
+    assert status["error_code"] == "BACKTEST_REJECTED"
+
+
 @pytest.mark.parametrize("version", [5, 6])
 def test_go_native_plan_hash_publication_and_tamper_detection(
     runtime: Runtime, version: int
@@ -290,6 +302,8 @@ def test_go_cancellation_and_timeout_reap_real_child(
         assert status["cancel_requested_at"] is not None
     status = runtime.wait(receipt["job_id"])
     assert status["status"] == ("CANCELLED" if cancel else "FAILED"), status
+    if not cancel:
+        assert status["error_code"] == "JOB_TIMEOUT"
     assert status["worker_pid"] is None
     assert not (runtime.results / receipt["job_id"]).exists()
     for pid in pids:
@@ -483,6 +497,79 @@ def test_go_scheduler_database_failure_reaps_owned_workers(runtime: Runtime) -> 
         assert not (runtime.results / receipt["job_id"]).exists()
     finally:
         (runtime.root / "release").touch()
+        if scheduler.poll() is None:
+            scheduler.terminate()
+            scheduler.communicate(timeout=15)
+
+
+def test_go_legacy_normalization_is_claimed_and_cancellable(runtime: Runtime) -> None:
+    """Slow adapter normalization must own a running slot and observe cancellation."""
+    import shlex
+    import signal
+
+    flag = runtime.root / "delay-normalization"
+    marker = runtime.root / "normalization-pids"
+    wrapper = runtime.root / "operator-python"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        f'if [ "$3" = normalize ] && [ -f {shlex.quote(str(flag))} ]; then\n'
+        f'  printf \'%s %s\\n\' "$PPID" "$$" > {shlex.quote(str(marker))}\n'
+        "  sleep 10\n"
+        "fi\n"
+        f'exec {shlex.quote(sys.executable)} "$@"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o700)
+    runtime.python = str(wrapper)
+    mapping = _request_v4(runtime.artifacts)
+    receipt = runtime.call("submit", "--queue", str(runtime.write(mapping)))
+    flag.touch()
+    scheduler = subprocess.Popen(
+        runtime.args("serve", "--once", "--concurrency", "1"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    worker_pid = None
+    try:
+        deadline = time.monotonic() + 20
+        while not marker.exists() and time.monotonic() < deadline:
+            assert scheduler.poll() is None, "scheduler exited before normalization"
+            time.sleep(0.02)
+        assert marker.exists(), "legacy worker did not enter normalization"
+        worker_pid, helper_pid = map(int, marker.read_text().split())
+        status = runtime.call("inspect", receipt["job_id"])
+        assert status["status"] == "RUNNING", status
+        assert status["worker_pid"] == worker_pid
+        started = time.monotonic()
+        runtime.call("cancel", receipt["job_id"])
+        deadline = started + 5
+        while time.monotonic() < deadline:
+            status = runtime.call("inspect", receipt["job_id"])
+            if status["status"] == "CANCELLED" and status["worker_pid"] is None:
+                break
+            time.sleep(0.02)
+        assert status["status"] == "CANCELLED" and status["worker_pid"] is None, status
+        assert time.monotonic() - started < 5, "cancellation waited for adapter sleep"
+        assert not Path(f"/proc/{helper_pid}").exists(), "normalization helper survived"
+        stdout, stderr = scheduler.communicate(timeout=5)
+        assert scheduler.returncode == 0, (stdout, stderr)
+    finally:
+        # Verify the exact task worker before signalling, including on the old RED build.
+        if worker_pid is not None:
+            try:
+                arguments = (
+                    Path(f"/proc/{worker_pid}/cmdline").read_bytes().split(b"\0")
+                )
+                executable = Path(f"/proc/{worker_pid}/exe").resolve()
+            except FileNotFoundError:
+                arguments, executable = [], None
+            if (
+                b"__worker" in arguments
+                and receipt["job_id"].encode() in arguments
+                and executable == runtime.executable.resolve()
+            ):
+                os.kill(worker_pid, signal.SIGINT)
         if scheduler.poll() is None:
             scheduler.terminate()
             scheduler.communicate(timeout=15)
