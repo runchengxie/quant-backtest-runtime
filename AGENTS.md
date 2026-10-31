@@ -6,11 +6,14 @@
 
 本仓库维护通用回测任务协议、SQLite 状态、worker、资源控制、产物校验、CLI 和发布工具。策略、研究来源记录和晋升规则属于 `quant-research`。独立 Rust 引擎入口和 NautilusTrader 适配属于 `quant-backtest-engine`；现有 Python 回测算法、执行模拟和结果协议继续在 `quant-platform` 维护作为兼容对照。runtime 不实现撮合或组合构造。
 
+Go 生命周期实现位于 `cmd/backtest-job` 和 `internal/`。Python 兼容包及无状态金融适配器位于 `src/backtest_runtime`。Go 管理同一任务库时，Python 适配器只能计算与写入暂存文件，不能变更任务状态或发布最终目录。
+
 ## 开发与交付
 
 - 先检查工作树、分支、远端和已有 worktree，保留其他任务的改动。
 - 拉取远端后，从 `origin/main` 创建独立分支和 worktree。临时 worktree 放在 `CODE_ROOT/.worktrees/<repo>-<topic>`；`CODE_ROOT` 从工作区明确指定的机器配置或环境变量解析，不使用固定的个人目录。
 - 使用锁定依赖，在任务 worktree 完成修改和验证。检查命令见 [开发文档](docs/development.md)。提交前必须通过 Ruff、ty、pytest 覆盖率检查和合成数据 CLI 检查。
+- Go 修改还需通过 gofmt、`go vet ./...`、`go test -race ./...`，并使用构建的 Go CLI 和固定 Rust 引擎运行 `tests/test_go_runtime.py`。缓存和编译结果放在源码之外。
 - 提交并推送任务分支，通过面向 `main` 的 PR 交付。审查和必需检查完成后合并，不跳过 hooks、不直推 `main`、不强推争抢合并。
 - 确认 PR 已合并且工作树没有唯一未保存内容后，清理本任务分支和 worktree。主检出干净时才 fast-forward 同步。
 - 跨仓修改分别开 PR，先合并提供接口或文档的仓库，再更新调用方。

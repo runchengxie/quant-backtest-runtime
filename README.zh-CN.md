@@ -2,11 +2,21 @@
 
 [English README](README.md)
 
+Go 实现负责管理任务状态和 worker，并持久化发布结果。v5、v6 Rust 引擎任务无需安装 Python。v1 至 v4 的金融计算通过显式配置的无状态 Python 适配器完成。
+
+在 Linux 上使用 Go 1.27.3 构建，将程序放到源码目录之外。
+
+```sh
+go build -trimpath -o /absolute/external/runtime/bin/backtest-job ./cmd/backtest-job
+```
+
+[Go 使用指南](docs/go-runtime.zh-CN.md)说明立即提交、常驻队列和旧版 Python 适配器的用法。生产切换前需要停止原来的任务管理进程并备份数据库。本次迁移没有切换生产服务或定时任务。
+
 `quant-backtest-runtime` 接收已提交的回测任务，负责校验请求、管理任务状态、运行 worker，并发布结果。这里的 runtime 指回测任务执行环境，不运行 LLM Agent。
 
 本项目属于 Quant Research 项目系列。同系列仓库各自独立维护，通过明确的接口协作：`quant-platform` 提供回测能力，私有 `quant-research` 管理策略研究和证据，本项目负责任务执行。
 
-## 跑通合成示例
+## Python 兼容示例
 
 需要 Linux 和 `uv`。包声明要求 Python 3.12 或更新版本，CI 验证 3.12、3.13，不覆盖其他 Python 版本：
 
@@ -26,7 +36,7 @@ uv run --locked --extra legacy python scripts/smoke_backtest.py
 - [运维指南](docs/operations.zh-CN.md)：部署、回滚和故障处理
 - [职责说明](docs/ownership.zh-CN.md)：了解本项目与上游、下游的分工
 
-## 安装方式
+## Python 兼容安装方式
 
 基础包没有 Python 运行时依赖，支持 v5/v6 Rust 任务、SQLite 生命周期管理、
 引擎结果校验，以及 agent 能力查询和预检。请单独安装经过审查的引擎可执行文件，

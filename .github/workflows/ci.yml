@@ -22,6 +22,24 @@ jobs:
         run: |
           uv run --locked --group docs mkdocs build --strict
           uv run --locked --group docs python project_tools/check_locale_navigation.py
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.3"
+      - name: Go formatting, analysis and race tests
+        run: |
+          test -z "$(gofmt -l cmd internal)"
+          go vet ./...
+          go test -race ./...
+      - name: Check reachable Go dependency vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Build Go CLI outside the source tree
+        run: go build -race -o "$RUNNER_TEMP/backtest-job" ./cmd/backtest-job
+
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -68,11 +86,25 @@ jobs:
           workspaces: .engine-source
       - uses: astral-sh/setup-uv@v6
       - run: cargo build --locked --manifest-path .engine-source/Cargo.toml
-      - run: uv sync --locked --group dev --python 3.13
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.27.3"
+      - name: Build Go CLI outside the source tree
+        run: go build -race -o "$RUNNER_TEMP/backtest-job" ./cmd/backtest-job
+      - run: uv sync --locked --extra legacy --group dev --python 3.13
+      - name: Go protocol checks against the real engine
+        env:
+          BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
+        run: go test -race ./internal/protocol
+      - name: Go lifecycle and legacy adapter integration
+        env:
+          BACKTEST_GO_EXECUTABLE: ${{ runner.temp }}/backtest-job
+          BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
+        run: uv run --locked --extra legacy pytest -q tests/test_go_runtime.py
       - name: Real Rust engine job and lifecycle checks
         env:
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
-        run: uv run --locked pytest -q tests/test_engine_validation.py tests/test_rust_engine_jobs.py tests/test_engine_sessions.py
+        run: uv run --locked --extra legacy pytest -q tests/test_engine_validation.py tests/test_rust_engine_jobs.py tests/test_engine_sessions.py
 
   minimal-install:
     runs-on: ubuntu-latest

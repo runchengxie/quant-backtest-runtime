@@ -2,55 +2,33 @@
 
 [中文页面](runtime-language.zh-CN.md)
 
-Keep the Python runtime in service. When development starts on a persistent scheduler, evaluate a Go prototype first. The Rust backtest engine stays independently released and communicates with the runtime through versioned JSON.
+Go implements CLI lifecycle management, SQLite state, persistent single-machine scheduling, process supervision and result publication. Rust remains the independently released backtest engine. Python remains the optional compatibility adapter for existing financial computation and contracts. Production cutover has not been performed.
 
-This record guides future implementation. This repository currently has no Go scheduler or Python-versus-Go benchmark results.
+## Current ownership
 
-## Current implementation
-
-`backtest-job submit` persists a job and directly starts an independent Python worker. The worker claims the job, invokes its backend and publishes results. SQLite stores state and leases. Cancellation and recovery check process identity.
-
-v5/v6 jobs use a separately installed Rust engine. The runtime checks the executable digest and launches the executable through a held descriptor. It terminates and reaps the child on timeout. Linux parent-death signalling handles unexpected worker death. The base installation requires Python but no third-party Python packages. The `legacy` extra provides the older backends.
-
-A persistent queue and a global concurrency limit remain to be implemented. Submitting many jobs can start many workers. Each job already has memory and wall-time limits. Global scheduling and resource budgets require explicit development.
-
-## Why evaluate Go next
-
-Goroutines can coordinate waiting jobs, while channels or semaphores bound active work. A context carries cancellation and deadlines. The prototype should establish whether maintainers find this implementation easier to understand and diagnose than extending Python.
-
-Rust also fits runtime development, particularly components that require precise resource control. Go adds another maintained language and cross-language protocol checks. No measurements currently show that either choice materially reduces total backtest time.
-
-| Approach | Useful investment | Remaining work |
-| --- | --- | --- |
-| Extend Python | Add single-machine scheduling using existing tests | Queueing, concurrency limits and recovery |
-| Prototype Go scheduling | Compare persistent-service implementation and maintenance | Process control and protocol compatibility |
-| Build a Rust runtime | Use one language for system components | State migration and recovery tests |
-
-The Go documentation specifies that `exec.CommandContext` cancels by calling `Kill` on its associated process by default. Descendant cleanup needs an explicit design, and `Wait` releases command resources. Preserve executable digest and process identity checks. See [os/exec](https://pkg.go.dev/os/exec) and [Go concurrency](https://go.dev/doc/effective_go#concurrency).
-
-## Prototype scope
-
-Use a separate synthetic job database and result directory. Initially, a Go scheduler can invoke the existing Python CLI. Python continues to manage job state and publish results. Go decides when to submit another job and queries completion through the job ID.
-
-The worker may still be running when `submit` returns. Release a concurrency slot only after the job reaches a terminal state and its processes have been cleaned up. After a scheduler restart, rediscover submitted jobs and use idempotency keys to handle a lost submission response. Invoke existing `cancel` and `recover` commands for cancellation and expired jobs. Direct Go writes to the same SQLite database require a separate design.
-
-First exercise successful completion, queueing and scheduler restart. Then inject completion/cancellation races, unexpected worker death and interrupted result publication. Use task-owned databases and retain full logs and program revisions.
-
-| Check | Acceptance evidence |
+| Component | Owner |
 | --- | --- |
-| Concurrency limit | Submit more jobs than the configured limit and continuously observe live workers staying within it |
-| Restart and idempotency | Kill the scheduler before and after submission responses, then recover one valid result per job |
-| Cancellation and reaping | Observe both worker and engine exit, with state consistent with actual processes |
-| Protocol compatibility | Preserve existing v1–v6 fingerprints, errors and result checks on shared fixtures |
-| Publication and recovery | Interrupted writes leave readers with complete, verified results only |
-| Operating cost | Record scheduler overhead separately from engine time, plus peak memory and cancellation latency |
+| Job claims, leases, cancellation and recovery | Go runtime |
+| Queue scheduling and explicit concurrency limit | Go runtime |
+| Final artifact verification and publication | Go runtime |
+| v5/v6 native execution | Independent Rust engine, supervised by Go |
+| Legacy financial computation and normalization | Optional stateless Python adapter |
+| Strategies, research provenance and promotion rules | Research repository |
 
-Measure the existing Python implementation first. Fix the machine, inputs and engine executable digest for the comparison. Set resource budgets and acceptable cancellation deadlines before using the results to decide on migration.
+Go's native v5/v6 path runs without Python. Legacy operations use an explicitly configured interpreter with `quant-backtest-runtime[legacy]` installed. The adapter writes staged artifacts and returns computation results; it does not manage SQLite or publish final directories. The existing Python CLI remains available for compatibility and rollback, with exclusive ownership of any database assigned to it.
 
-## Ownership transfer
+Ordinary `submit` immediately starts a detached worker. Queue scheduling uses `submit --queue` and `serve --concurrency N`; use a dedicated queue database and one scheduler. Do not mix these modes. The limit covers scheduler-managed workers, and a slot is held through process reaping. See [Go runtime usage](go-runtime.md) for commands and deployment steps.
 
-First establish cross-language fixtures for JSON normalization, request SHA-256 and idempotency. Preserve decimal monetary strings without converting through binary floating-point values before hashing.
+## Process and protocol boundaries
 
-Before Go takes over state management, define the sole SQLite owner and change workers to compute, write staged artifacts and return execution results. Go can then manage claims, leases and final publication. Retain a rollback path and keep each job assigned to one state-management implementation during migration.
+The runtime opens and hashes executable bytes, then executes through the held descriptor. A reexec helper applies Linux memory limits immediately before execution. Parent-death signals, explicit process-group termination, bounded output and reaping cover child lifecycle. Worker cancellation and recovery establish identity through pidfds and exact worker arguments. These controls manage trusted workloads and do not constitute an untrusted-code sandbox.
 
-Evaluate multiple machines after single-machine scheduling is stable. Remote workers need shared artifact storage and a new claim protocol, including protection against expired workers publishing results.
+Go verifies engine results and financial evidence without implementing order matching or portfolio construction. Cross-language fixtures check canonical request bytes and SHA-256 identity. Keep decimal monetary values exact. Existing request and result schemas remain the compatibility contract; fixture coverage alone does not prove every historical workload is supported.
+
+## Deployment status and remaining evidence
+
+The implementation is available for validation on separate synthetic databases. No production database or schedule has been switched. Before cutover, quiesce Python workers and submissions, back up state and artifacts, and record the tested runtime, engine and adapter revisions. Go must become the sole lifecycle owner. Rollback requires quiescing Go and confirming no active workers remain before restoring Python ownership.
+
+Lifecycle tests exercise queue persistence, bounded concurrency, cancellation, process cleanup and publication integrity. Continue to check deployment-specific historical fixtures and failure recovery before assigning production ownership. Keep the Python deployment available until those checks pass.
+
+No controlled Python-versus-Go benchmark establishes a reduction in total backtest time. Record scheduler overhead separately from engine execution, alongside peak memory and cancellation latency. Multiple-machine scheduling remains separate work requiring shared artifact storage, a distributed claim protocol and protection against expired workers publishing results.

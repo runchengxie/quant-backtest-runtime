@@ -20,7 +20,16 @@ def _replace_link(link: Path, target: Path) -> None:
     temporary.replace(link)
 
 
-def stage(repo: Path, production: Path, commit: str, *, dry_run: bool) -> Path:
+def stage(
+    repo: Path,
+    production: Path,
+    commit: str,
+    *,
+    dry_run: bool,
+    implementation: str = "python",
+) -> Path:
+    if implementation not in {"python", "go"}:
+        raise ValueError("implementation must be python or go")
     sha = _git(repo, "rev-parse", "--verify", f"{commit}^{{commit}}")
     ancestor = subprocess.run(
         ["git", "-C", str(repo), "merge-base", "--is-ancestor", sha, "origin/main"],
@@ -52,16 +61,51 @@ def stage(repo: Path, production: Path, commit: str, *, dry_run: bool) -> Path:
         source.rename(destination)
     # Venv entrypoints embed the absolute interpreter path, so install only
     # after the source has reached its immutable release location.
-    subprocess.run(["uv", "sync", "--locked", "--no-dev"], cwd=destination, check=True)
+    _install(destination, sha, implementation)
     (destination / ".release-ready").write_text(sha + "\n", encoding="ascii")
     return destination
 
 
+def _install(destination: Path, sha: str, implementation: str) -> None:
+    if implementation == "go":
+        executable = destination / "bin/backtest-job"
+        executable.parent.mkdir()
+        subprocess.run(
+            [
+                "go",
+                "build",
+                "-trimpath",
+                "-buildvcs=false",
+                "-mod=readonly",
+                "-ldflags",
+                f"-X github.com/runchengxie/quant-backtest-runtime/internal/app.SourceRevision={sha}",
+                "-o",
+                str(executable),
+                "./cmd/backtest-job",
+            ],
+            cwd=destination,
+            check=True,
+        )
+        (destination / ".runtime-implementation").write_text("go\n", encoding="ascii")
+    else:
+        subprocess.run(
+            ["uv", "sync", "--locked", "--no-dev"], cwd=destination, check=True
+        )
+
+
 def switch(production: Path, commit: str, *, dry_run: bool) -> None:
     release = production / "releases" / commit
+    marker = release / ".runtime-implementation"
+    implementation = (
+        marker.read_text(encoding="ascii").strip() if marker.is_file() else "python"
+    )
+    executable = (
+        "bin/backtest-job" if implementation == "go" else ".venv/bin/backtest-job"
+    )
     if (
         not release.is_dir()
-        or not (release / ".venv/bin/backtest-job").is_file()
+        or implementation not in {"python", "go"}
+        or not (release / executable).is_file()
         or not (release / ".release-ready").is_file()
         or (release / ".release-ready").read_text(encoding="ascii").strip() != commit
     ):
@@ -97,14 +141,22 @@ def main() -> None:
     parser.add_argument("--production", type=Path, required=True)
     parser.add_argument("--dry-run", action="store_true")
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("stage").add_argument("commit")
+    staging = commands.add_parser("stage")
+    staging.add_argument("commit")
+    staging.add_argument("--implementation", choices=("python", "go"), default="python")
     commands.add_parser("switch").add_argument("commit")
     commands.add_parser("rollback")
     args = parser.parse_args()
     repo = args.repo.resolve()
     production = args.production.resolve()
     if args.command == "stage":
-        stage(repo, production, args.commit, dry_run=args.dry_run)
+        stage(
+            repo,
+            production,
+            args.commit,
+            dry_run=args.dry_run,
+            implementation=args.implementation,
+        )
     elif args.command == "switch":
         switch(production, args.commit, dry_run=args.dry_run)
     else:

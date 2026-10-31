@@ -28,6 +28,8 @@ Ruff checks imports, common errors, unsafe exception handling, obsolete syntax, 
 
 ## Coverage and test boundaries
 
+Go checks run with Go 1.27.3 using the committed `go.mod` and `go.sum`. Run `gofmt`, `go vet ./...` and `go test -race ./...`, then build the CLI outside the source tree and run `tests/test_go_runtime.py` with both executable environment variables shown in the [Go guide](go-runtime.md). The real-engine CI job builds a CLI with race detection enabled. Native protocols and legacy compatibility are both exercised against the existing Python contracts.
+
 Coverage includes statements and branches and combines data from Python subprocesses. The CLI restricts worker environment variables, so some indirectly launched workers do not inherit coverage settings. Direct worker integration tests retain subprocess coverage; forcibly terminated processes may not write coverage data. The current combined threshold is 75%. Raising it requires additional behavior tests; excluding code or deleting assertions is not an acceptable shortcut.
 
 Tests cover request fingerprints and idempotency, competing state updates, cancellation, timeouts, startup failures, lease recovery, result tampering, and v1–v4 subprocess replays, including sequenced execution and trade-accounting result checks. `scripts/smoke_backtest.py` verifies that the installed CLI, independent worker, and synthetic example work together.
