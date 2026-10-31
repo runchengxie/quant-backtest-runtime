@@ -268,7 +268,13 @@ def _write_result(
             quant_manifest_path, quant_manifest = service.validate_quant_run_manifest(
                 request
             )
-        if request.schema_version == 4:
+        if request.schema_version == 5:
+            from .engine_publication import write_engine_result
+
+            manifest = write_engine_result(
+                tmp_dir, result, job_id=job_id, request=request
+            )
+        elif request.schema_version == 4:
             path = tmp_dir / "accounting.parquet"
             result.to_parquet(path, index=False)
             manifest = {
@@ -376,6 +382,7 @@ def execute_job(
     registry_path: str | Path,
     artifact_root: str | Path,
     result_root: str | Path,
+    engine_executable: Path | None = None,
 ) -> int:
     previous_umask = os.umask(0o077)
     try:
@@ -418,6 +425,7 @@ def execute_job(
             request=request,
             service=service,
             result_root=Path(result_root).expanduser().resolve(),
+            engine_executable=engine_executable,
         )
     finally:
         registry.close()
@@ -430,6 +438,7 @@ def _execute_claimed_job(
     request: BacktestJobRequest,
     service: BacktestJobService,
     result_root: Path,
+    engine_executable: Path | None = None,
 ) -> int:
     def _cancel(_signum: int, _frame: Any) -> None:
         raise JobCancelled
@@ -443,7 +452,12 @@ def _execute_claimed_job(
     signal.alarm(request.budgets["wall_seconds"])
     try:
         _apply_memory_limit(request.budgets["memory_mb"])
-        result = _run_native_backend(request, service)
+        if request.schema_version == 5:
+            from .engine_runner import run_engine
+
+            result = run_engine(request, service, engine_executable)
+        else:
+            result = _run_native_backend(request, service)
         return _publish_job_result(
             result,
             job_id=job_id,
@@ -559,12 +573,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--registry", required=True)
     parser.add_argument("--artifact-root", required=True)
     parser.add_argument("--result-root", required=True)
+    parser.add_argument("--engine-executable", type=Path)
     args = parser.parse_args(argv)
     return execute_job(
         args.job_id,
         registry_path=args.registry,
         artifact_root=args.artifact_root,
         result_root=args.result_root,
+        engine_executable=args.engine_executable,
     )
 
 

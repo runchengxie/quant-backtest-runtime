@@ -51,3 +51,25 @@ jobs:
         run: uv run --locked pip-audit --local
       - name: Documentation build
         run: uv run --locked --group docs mkdocs build --strict
+
+  rust-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: runchengxie/quant-backtest-engine
+          ref: a2dc923b01c46389f090db7865175c5d87b6819c
+          path: .engine-source
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .engine-source
+      - uses: astral-sh/setup-uv@v6
+      - run: cargo build --locked --manifest-path .engine-source/Cargo.toml
+      - run: uv sync --locked --group dev --python 3.13
+      - name: Real Rust engine job and lifecycle checks
+        env:
+          BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
+        run: uv run --locked pytest -q tests/test_rust_engine_jobs.py

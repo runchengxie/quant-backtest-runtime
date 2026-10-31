@@ -21,6 +21,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--database", type=Path, required=True)
     parser.add_argument("--artifact-root", type=Path, required=True)
     parser.add_argument("--result-root", type=Path, required=True)
+    parser.add_argument("--engine-executable", type=Path)
     commands = parser.add_subparsers(dest="command", required=True)
     submit = commands.add_parser("submit")
     submit.add_argument("manifest", type=Path)
@@ -52,6 +53,8 @@ def _start_worker(args: argparse.Namespace, store: JobStore, job_id: str) -> Non
         "--result-root",
         str(args.result_root.resolve()),
     ]
+    if args.engine_executable is not None:
+        command.extend(["--engine-executable", str(args.engine_executable.resolve())])
     environment = {
         name: os.environ[name]
         for name in ("PATH", "LD_LIBRARY_PATH", "LANG", "LC_ALL", "TMPDIR")

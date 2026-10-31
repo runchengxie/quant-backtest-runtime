@@ -54,3 +54,28 @@ coverage 同时统计语句和分支，并启用 Python 子进程采集。独立
 | `cli.py` | 命令解析和 worker 启动 |
 
 `jobs.BacktestJobRequest` 保留导入兼容性，新代码可直接从 `contracts` 导入。提交 PR 时说明行为变化、验证命令和结果，跨仓修改附上关联 PR。
+
+## 可选 Rust 引擎任务（v5）
+
+新增 `nautilus.quote_market_orders` 后端，调用独立的
+[quant-backtest-engine](https://github.com/runchengxie/quant-backtest-engine)。
+旧 v1–v4 的规范化和请求指纹保持不变，新版本只提供 diagnostic 最终快照，
+不能当作 v2 的完整每日执行账本。
+
+由运维通过 `--engine-executable` 指定绝对路径；请求只能通过
+`config.executable_sha256` 固定二进制内容，不能提交任意命令。
+`inputs.engine_request_ref` 引用标准 SHA-256 目录中的不可变引擎 JSON 请求，
+`execution` 为空对象。完整请求示例与命令见本页对应的
+[英文说明](development.md#independent-rust-engine-jobs-v5)。
+
+Python worker 继续独占 SQLite 状态和结果发布；Rust 子进程继承地址空间限制，
+取消和超时会终止并回收它，父进程被硬杀时使用 Linux parent-death SIGKILL 清理。
+这只面向当前单线程 Linux worker，不宣称能安全运行不可信程序。
+二进制哈希固定的是构建字节，部署记录仍需保存源提交和工具链。
+
+结果采用独立的 `quant.engine_job_result.v1` 清单，包含 engine_result.json、
+大小、哈希和资金摘要；读取时重新核对完整性。任务成功不代表所有订单都成交。
+A 股交易规则和日频账本尚未完成新引擎兼容验证，不能自动切换旧任务。
+
+设置 `BACKTEST_ENGINE_TEST_EXECUTABLE` 可运行真实引擎集成测试；专门的 CI
+会构建固定的已合并提供方提交并验证，其他测试覆盖超时、取消、父进程硬杀和非法输出。
