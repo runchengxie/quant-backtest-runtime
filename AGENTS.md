@@ -4,7 +4,7 @@
 
 由用户本人提交，或由用户明确委托 agent 完成的 PR，无需单独的人工 review；这是持续有效的授权，不需要逐个 PR 确认，并覆盖本文件中的一般 PR review 要求。必需检查仍须通过，冲突必须解决；不得绕过 hooks 或 GitHub 分支保护、ruleset 强制要求的审批。
 
-本仓库维护通用回测任务协议、SQLite 状态、worker、资源控制、产物校验、CLI 和发布工具。策略、研究来源记录和晋升规则属于 `quant-research`。可复用的回测算法、执行模拟和结果协议属于 `quant-platform`。
+本仓库维护通用回测任务协议、SQLite 状态、worker、资源控制、产物校验、CLI 和发布工具。策略、研究来源记录和晋升规则属于 `quant-research`。独立 Rust 引擎入口和 NautilusTrader 适配属于 `quant-backtest-engine`；现有 Python 回测算法、执行模拟和结果协议继续在 `quant-platform` 维护作为兼容对照。runtime 不实现撮合或组合构造。
 
 ## 开发与交付
 

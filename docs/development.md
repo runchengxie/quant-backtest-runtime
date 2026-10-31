@@ -48,3 +48,67 @@ Tests cover request fingerprints and idempotency, competing state updates, cance
 | `cli.py` | Argument parsing and worker startup |
 
 `jobs.BacktestJobRequest` remains import-compatible; new code may import it directly from `contracts`.
+
+## Independent Rust engine jobs (v5)
+
+The opt-in `nautilus.quote_market_orders` backend launches
+[quant-backtest-engine](https://github.com/runchengxie/quant-backtest-engine).
+It does not change v1–v4 normalization or fingerprints. It currently provides a
+**diagnostic final snapshot**, not the execution-aware daily ledger of v2.
+
+Install/build the engine from a reviewed, merged revision outside task worktrees.
+Dedicated CI pins provider `a2dc923b01c46389f090db7865175c5d87b6819c` and tests the real binary with this
+consumer revision; local validation uses that provider's identical tested sources.
+Pass the absolute executable using the operator CLI option `--engine-executable`.
+The submitted request cannot select an arbitrary executable path or shell command.
+It pins the executable bytes with `config.executable_sha256` instead.
+
+```json
+{
+  "schema_version": 5,
+  "idempotency_key": "synthetic-engine-1",
+  "backend": "nautilus.quote_market_orders",
+  "evidence_tier": "diagnostic",
+  "inputs": {"engine_request_ref": "artifact://sha256/<request-file-sha256>"},
+  "config": {"executable_sha256": "<installed-executable-sha256>"},
+  "execution": {},
+  "budgets": {"wall_seconds": 30, "memory_mb": 4096}
+}
+```
+
+Store the engine JSON request as an immutable artifact under the existing SHA-256
+artifact layout. Its schema is `engine_request.v1` (see the engine repository fixture).
+A whole job request fingerprint therefore binds both input bytes and the selected
+executable. Hashes identify exact build bytes, not source revisions or signed provenance;
+record the source revision and build toolchain in deployment records as well.
+The runner executes a held, verified inode through `/proc/self/fd`, so atomic path
+replacement cannot change the selected executable. Publish immutable binaries using
+atomic replacement; do not modify an executable inode in place during a job.
+
+```sh
+backtest-job --database /data/jobs.sqlite --artifact-root /data/artifacts   --result-root /data/results --engine-executable /releases/engine/quant-backtest-engine   submit /data/job-v5.json
+```
+
+The Python worker remains the sole SQLite writer and result publisher. The Rust child
+inherits its address-space limit; timeout/cancellation kills and reaps the child.
+Linux parent-death SIGKILL handles hard worker death and expired-worker recovery.
+The runner is intended only for the existing single-threaded Linux worker, not a
+multithreaded embedding host. The engine is a trusted, pinned binary; this is not a
+sandbox for untrusted executables or strategies. Temporary request/output files use
+the worker's temporary directory; no private data belongs in source repositories.
+
+Published `quant.engine_job_result.v1` manifests contain one `engine_result.json`
+entry, size/SHA-256 inventory, executable digest and final balance summary. Reads
+verify integrity and financial summary consistency. Orders may be rejected even when
+the job succeeds; inspect the normalized engine order statuses. Market rules and
+information-time limitations remain those explicitly documented by the engine.
+
+To run the real integration locally (build outputs stay outside the source tree):
+
+```sh
+BACKTEST_ENGINE_TEST_EXECUTABLE=/absolute/path/to/quant-backtest-engine   uv run --locked pytest -q tests/test_rust_engine_jobs.py
+```
+
+Without that variable the real-engine test is skipped; dedicated `rust-engine` CI
+builds the pinned provider and must pass it. Other lifecycle tests use controlled
+fixture processes to verify failure, cancellation, hard parent death and timeout.

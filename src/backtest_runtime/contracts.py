@@ -103,14 +103,15 @@ def artifact_digest(value: Any, *, label: str) -> str:
 
 def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
     version = mapping["schema_version"]
-    if type(version) is not int or version not in {1, 2, 3, 4}:
-        raise ValueError("schema_version must be integer 1, 2, 3 or 4")
+    if type(version) is not int or version not in {1, 2, 3, 4, 5}:
+        raise ValueError("schema_version must be integer 1, 2, 3, 4 or 5")
     key = mapping["idempotency_key"]
     if not isinstance(key, str) or not _IDEMPOTENCY_KEY.fullmatch(key):
         raise ValueError("idempotency_key must be 1-128 safe ASCII characters")
     backend = {
         3: "native.sequenced_execution",
         4: "native.trade_accounting",
+        5: "nautilus.quote_market_orders",
     }.get(version, "native.position_replay")
     if mapping["backend"] != backend:
         raise ValueError(f"backend must be {backend} in v{version}")
@@ -121,6 +122,11 @@ def _validate_request_identity(mapping: dict[str, Any]) -> tuple[str, str]:
 
 
 def _validate_inputs(value: Any, *, version: int) -> dict[str, str]:
+    if version == 5:
+        inputs = _exact_keys(value, {"engine_request_ref"}, label="engine inputs")
+        return {
+            "engine_request_ref": f"artifact://sha256/{artifact_digest(inputs['engine_request_ref'], label='engine_request_ref')}"
+        }
     if version == 4:
         if not isinstance(value, dict) or set(value) != {"accounting_ref"}:
             raise ValueError("trade accounting inputs must contain accounting_ref")
@@ -390,6 +396,12 @@ def _validate_accounting_config(
 def _validate_backend_config(
     mapping: dict[str, Any], version: int
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    if version == 5:
+        config = _exact_keys(mapping["config"], {"executable_sha256"}, label="config")
+        digest = config["executable_sha256"]
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("config.executable_sha256 must be lowercase SHA-256")
+        return dict(config), _exact_keys(mapping["execution"], set(), label="execution")
     if version == 3:
         return _validate_sequenced_config(mapping)
     if version == 4:

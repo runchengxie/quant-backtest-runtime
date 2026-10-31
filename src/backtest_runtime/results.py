@@ -38,6 +38,10 @@ def read_job_result(
     if schema == "quant.backtest_job_result.v2":
         _verify_official_bundle(root, payload, job_id, request_sha256)
         _verify_quant_run_manifest(root, payload)
+    elif schema == "quant.engine_job_result.v1":
+        from .engine_publication import verify_engine_result
+
+        verify_engine_result(root, payload)
     elif schema == "quant.trade_accounting_result.v1":
         _verify_trade_accounting(root, payload)
     elif schema == "ticknet.backtest_job_result.v1":
