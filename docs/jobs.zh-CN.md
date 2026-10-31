@@ -41,8 +41,8 @@ v2 由调用方提供完整的 `research.clock.v1`。一个 v2 Job 对应一次�
 
 ```bash
 runtime_data_root=$(mktemp -d)
-uv run --locked python scripts/create_example.py --output "$runtime_data_root"
-uv run --locked backtest-job \
+uv run --locked --extra legacy python scripts/create_example.py --output "$runtime_data_root"
+uv run --locked --extra legacy backtest-job \
   --database "$runtime_data_root/jobs.sqlite" \
   --artifact-root "$runtime_data_root/artifacts" \
   --result-root "$runtime_data_root/results" \

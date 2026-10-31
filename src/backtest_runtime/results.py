@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .legacy import require_legacy
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -35,6 +37,12 @@ def read_job_result(
     ):
         raise ValueError("Job result identity mismatch")
     schema = payload.get("schema_version")
+    if schema in {
+        "quant.backtest_job_result.v2",
+        "quant.trade_accounting_result.v1",
+        "ticknet.backtest_job_result.v1",
+    }:
+        require_legacy()
     if schema == "quant.backtest_job_result.v2":
         _verify_official_bundle(root, payload, job_id, request_sha256)
         _verify_quant_run_manifest(root, payload)

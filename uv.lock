@@ -1053,7 +1053,9 @@ wheels = [
 name = "quant-backtest-runtime"
 version = "0.1.0"
 source = { editable = "." }
-dependencies = [
+
+[package.optional-dependencies]
+legacy = [
     { name = "quant-platform" },
 ]
 
@@ -1070,7 +1072,8 @@ docs = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "quant-platform", git = "https://github.com/runchengxie/quant-platform.git?rev=15ec62b66e894395d694049eaaace931de4a1265" }]
+requires-dist = [{ name = "quant-platform", marker = "extra == 'legacy'", git = "https://github.com/runchengxie/quant-platform.git?rev=15ec62b66e894395d694049eaaace931de4a1265" }]
+provides-extras = ["legacy"]
 
 [package.metadata.requires-dev]
 dev = [

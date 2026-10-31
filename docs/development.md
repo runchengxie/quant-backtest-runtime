@@ -5,18 +5,18 @@
 Run the locked local checks from an isolated task worktree:
 
 ```bash
-uv sync --locked --group dev --python 3.13
-uv run --locked ruff check src scripts tests
-uv run --locked ruff format --check src scripts tests
-uv run --locked ty check src scripts
-uv run --locked coverage erase
-uv run --locked coverage run -m pytest -q
-uv run --locked coverage combine
-uv run --locked coverage report
-uv run --locked python scripts/smoke_backtest.py
-uv run --locked pip-audit --local
-uv run --locked --group docs mkdocs build --strict
-uv run --locked --group docs python project_tools/check_locale_navigation.py
+uv sync --locked --extra legacy --group dev --python 3.13
+uv run --locked --extra legacy ruff check src scripts tests
+uv run --locked --extra legacy ruff format --check src scripts tests
+uv run --locked --extra legacy ty check src scripts
+uv run --locked --extra legacy coverage erase
+uv run --locked --extra legacy coverage run -m pytest -q
+uv run --locked --extra legacy coverage combine
+uv run --locked --extra legacy coverage report
+uv run --locked --extra legacy python scripts/smoke_backtest.py
+uv run --locked --extra legacy pip-audit --local
+uv run --locked --extra legacy --group docs mkdocs build --strict
+uv run --locked --extra legacy --group docs python project_tools/check_locale_navigation.py
 git diff --check
 ```
 
@@ -125,7 +125,7 @@ information-time limitations remain those explicitly documented by the engine.
 To run the real integration locally (build outputs stay outside the source tree):
 
 ```sh
-BACKTEST_ENGINE_TEST_EXECUTABLE=/absolute/path/to/quant-backtest-engine   uv run --locked pytest -q tests/test_rust_engine_jobs.py
+BACKTEST_ENGINE_TEST_EXECUTABLE=/absolute/path/to/quant-backtest-engine   uv run --locked --extra legacy pytest -q tests/test_rust_engine_jobs.py
 ```
 
 Without that variable the real-engine test is skipped; dedicated `rust-engine` CI
@@ -162,3 +162,40 @@ receivables, delisting policies, daily-volume participation and exchange-specifi
 schedules are not inferred. Keep the existing Python backend for unsupported scenarios.
 Dedicated CI tests both v5 and v6 against merged provider
 `341de0177bc3e6b95ff8b4abb8c80c83eaedf207`.
+
+## Installation variants
+
+The base package has no Python runtime dependencies. It supports v5/v6 Rust jobs,
+SQLite lifecycle management, engine result verification, and agent discovery and
+preflight. Install a reviewed engine executable separately and pass its absolute
+path with `--engine-executable`:
+
+```sh
+pip install quant-backtest-runtime
+# From this repository, with locked development tools but no legacy stack:
+uv sync --locked --group dev
+```
+
+For v1-v4 execution, legacy result reads, or `quant_run_manifest_ref` validation,
+install the explicit compatibility extra:
+
+```sh
+pip install 'quant-backtest-runtime[legacy]'
+# Locked repository workflow:
+uv sync --locked --extra legacy --group dev
+```
+
+The extra pins quant-platform to a reviewed Git revision and requires Git access.
+The `dev` group does not enable it automatically. Missing packages produce
+`LEGACY_DEPENDENCY_UNAVAILABLE` with installation guidance; CLI plan and submit
+reject the request before creating state. Dependency preflight checks package
+availability only, without importing pandas or portfolio code; it does not prove
+backend compatibility or request semantics. Existing v1-v6 request fingerprints,
+plan payloads and persisted state contracts remain unchanged. v6 plans still mark
+engine semantics `not_checked`; v5 uses the engine's static validator.
+
+This is an installation boundary, not migration of Python algorithms to Rust.
+Keep the legacy extra until callers and unsupported scenarios have migrated.
+Runtime continues to own process supervision, SQLite state and result publication
+verification through its engine protocol; it does not use the provider SDK as a
+subprocess supervisor.

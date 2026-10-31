@@ -66,6 +66,11 @@ class BacktestJobService:
         if not sys.platform.startswith("linux"):
             message = "local backtest jobs require Linux resource and process controls"
             raise RuntimeError(message)
+        from .legacy import require_request_dependencies
+
+        require_request_dependencies(
+            request.schema_version, request.quant_run_manifest_ref
+        )
         checked_request = BacktestJobRequest.from_mapping(request.to_mapping())
         if (
             checked_request.request_sha256 != request.request_sha256
