@@ -2,7 +2,7 @@
 
 [中文页面](go-runtime.zh-CN.md)
 
-The Go `backtest-job` CLI owns SQLite state, worker supervision, scheduling and final result publication. Native v5/v6 jobs call the independently installed Rust engine without Python. Production databases and schedules have not been switched to Go.
+The Go `backtest-job` CLI owns SQLite state, worker supervision, scheduling and final result publication. Native v5/v6 jobs call the independently installed Rust engine without Python. Deployment configuration selects the active implementation.
 
 ## Build and validate
 
@@ -59,7 +59,7 @@ systemd-run --user --wait --pipe --collect \
 
 These values are an example for a synthetic check. Choose production limits from measured workload peaks and leave room for the scheduler. Verify the effective `memory.max`, `memory.swap.max` and `cpu.max` in the service's cgroup. A separate controlled allocation probe should verify that a child exceeding the memory boundary is killed. Keep its inputs and outputs isolated from real tasks.
 
-For a persistent queue, launch `backtest-job ... serve --concurrency N` as the service command. Submit only queued jobs from outside that service. Workers launched by the scheduler inherit its cgroup; immediate submissions from elsewhere do not. The service memory ceiling covers the whole queue process tree. Individual jobs retain their separate child address-space budgets. An out-of-memory event can interrupt several jobs, so inspect their processes and use `recover` after restarting. This arrangement does not establish per-job aggregate memory accounting.
+For a persistent queue, launch `backtest-job ... serve --concurrency N` as the service command. Submit only queued jobs from outside that service. Workers launched by the scheduler inherit its cgroup; immediate submissions from elsewhere do not. The service memory ceiling covers the whole queue process tree. Individual jobs retain their separate child address-space budgets. An out-of-memory event can interrupt several jobs, so inspect their processes and use `recover` after restarting. For per-job aggregate limits, enable the delegated mode below.
 
 ## Submit a native job
 
@@ -98,6 +98,20 @@ Use a database dedicated to queue submissions. Submit each job with `submit --qu
 
 The scheduler discovers persisted queued jobs after restart. A slot remains occupied until its worker has been reaped. Use `serve --concurrency 4 --once` to drain the queue and exit during validation. Keep one scheduler per database and do not mix immediate submissions with scheduler-managed work.
 
+## Limit each queued job
+
+Run `serve --cgroup-root auto` under a systemd service with `Delegate=memory` and `DelegateSubgroup=supervisor`. The scheduler must start in the delegated `supervisor` subgroup. Alternatively pass an absolute, empty, delegated cgroup v2 parent through `--cgroup-root`. Ordinary directories and missing delegation fail with `RESOURCE_LIMIT_UNAVAILABLE`; no weaker fallback is used. This option is available only to `serve`.
+
+The scheduler creates a database-specific namespace and a fresh group for each job. Linux clones the worker directly into that group before Go initialization. `budgets.memory_mb` sets its `memory.max` in MiB, with swap disabled and group OOM termination enabled. The group includes the worker, engine and optional Python descendants. The scheduler remains outside. The existing child address-space limit also applies. Physical memory accounting differs from virtual address-space accounting, so this adds an aggregate boundary without claiming equivalence to the old Python limit.
+
+An OOM-killed active worker becomes `FAILED` with `JOB_MEMORY_EXCEEDED`. Cancellation takes precedence when already requested. The scheduler continues with later queued jobs. It records memory peak and OOM counters in `.logs/<job-id>.resources.json`, synchronizes a snapshot before removing the group, and marks final cleanup in the receipt. Receipt storage failure stops scheduling and retains the group/counters when removal has not happened. Published financial result manifests keep their existing contract.
+
+Restart reconciliation retains live claimed workers and counts their slots. A worker interrupted between spawn and claim is conservatively failed and its group cleared. Completed or abandoned groups are killed and removed before reuse. Existing successful state is preserved. These controls supervise trusted code; a process with permission to edit the delegated hierarchy can alter its own controls.
+
+Use [the TOML example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/configs/runtime.example.toml) and [the user service template](https://github.com/runchengxie/quant-backtest-runtime/blob/main/configs/quant-backtest-runtime.service). Keep actual paths in private deployment configuration. `scripts/serve_config.py --config /configured/runtime.toml --dry-run` prints the command without opening the task database. Without `--dry-run`, the standard-library launcher replaces itself with Go. The same `[runtime]` table can configure research clients. Set `queue=true`, pin the engine and optional adapter interpreter, and tune `[scheduler].concurrency` to measured capacity. Install the unit in the user's systemd directory, reload it, and validate with a separate synthetic task database before assigning real work.
+
+Kernel memory controller behavior is documented in [cgroup v2](https://docs.kernel.org/admin-guide/cgroup-v2.html). Delegation and subgroup settings are described in [systemd resource control](https://www.freedesktop.org/software/systemd/man/latest/systemd.resource-control.html).
+
 ## Optional Python compatibility adapter
 
 For legacy v1–v4 requests and operations that need legacy contract validation, install `quant-backtest-runtime[legacy]` into a Python environment and pass that interpreter's absolute path with `--python-executable`. From the repository, `uv sync --locked --extra legacy --group dev` provides the locked development environment.
@@ -106,7 +120,7 @@ Go invokes the stateless adapter through that interpreter. Python normalizes the
 
 ## Cutover and rollback
 
-`budgets.memory_mb` applies a hard address-space limit to the engine or legacy computation child. The Go job-management process is outside this limit. Whole-job memory parity with the former Python worker has not been established. Deployments that require a strict aggregate memory budget must validate a whole-job mechanism, such as a delegated cgroup, before cutover. Queue concurrency limits remain independent of this memory boundary.
+`budgets.memory_mb` applies a hard address-space limit to the engine or legacy computation child. The Go job-management process is outside this limit. Whole-job memory parity with the former Python worker has not been established. Enable and validate the delegated per-job mode for deployments requiring an aggregate memory budget. Queue concurrency limits remain independent of this memory boundary.
 
 Before a production cutover, stop new Python submissions, quiesce its workers and scheduler, and back up the database and associated artifacts. Validate Go with a separate synthetic database first. Record the runtime revision, engine revision and executable digest, Python environment when used, and validation results before assigning Go sole ownership of the production database.
 

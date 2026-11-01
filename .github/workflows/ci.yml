@@ -102,6 +102,13 @@ jobs:
           BACKTEST_EXPECTED_RUNTIME_REVISION: ${{ github.sha }}
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
         run: uv run --locked --extra legacy pytest -q tests/test_go_runtime.py tests/test_native_smoke.py
+      - name: Delegated per-job memory, cancellation and restart checks
+        run: |
+          go test -c -o "$RUNNER_TEMP/jobgroup.test" ./internal/jobgroup
+          go test -c -o "$RUNNER_TEMP/app.test" ./internal/app
+          sudo systemd-run --wait --pipe --collect --unit="runtime-group-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" -p Delegate=memory -p DelegateSubgroup=supervisor /usr/bin/env JOBGROUP_INTEGRATION=1 "$RUNNER_TEMP/jobgroup.test" -test.run TestDelegatedLifecycle -test.v
+          sudo systemd-run --wait --pipe --collect --unit="runtime-receipt-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" -p Delegate=memory -p DelegateSubgroup=supervisor /usr/bin/env JOBGROUP_INTEGRATION=1 "$RUNNER_TEMP/app.test" -test.run TestResourceReceiptPrecedesGroupRemoval -test.v
+          sudo systemd-run --wait --pipe --collect --unit="runtime-memory-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" -p Delegate=memory -p DelegateSubgroup=supervisor --working-directory="$GITHUB_WORKSPACE" /usr/bin/env GORACE=atexit_sleep_ms=0 BACKTEST_CGROUP_ROOT=auto BACKTEST_GO_EXECUTABLE="$RUNNER_TEMP/backtest-job" BACKTEST_ENGINE_TEST_EXECUTABLE="$GITHUB_WORKSPACE/.engine-source/target/debug/quant-backtest-engine" "$GITHUB_WORKSPACE/.venv/bin/python" -m pytest -q tests/test_go_cgroups.py
       - name: Real Rust engine job and lifecycle checks
         env:
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine

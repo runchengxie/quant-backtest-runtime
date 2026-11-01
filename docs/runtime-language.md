@@ -2,7 +2,7 @@
 
 [中文页面](runtime-language.zh-CN.md)
 
-Go implements CLI lifecycle management, SQLite state, persistent single-machine scheduling, process supervision and result publication. Rust remains the independently released backtest engine. Python remains the optional compatibility adapter for existing financial computation and contracts. Production cutover has not been performed.
+Go implements CLI lifecycle management, SQLite state, persistent single-machine scheduling, process supervision and result publication. Rust remains the independently released backtest engine. Python remains the optional compatibility adapter for existing financial computation and contracts. Deployment configuration selects the active implementation.
 
 ## Current ownership
 
@@ -27,7 +27,7 @@ Go verifies engine results and financial evidence without implementing order mat
 
 ## Deployment status and remaining evidence
 
-The implementation is available for validation on separate synthetic databases. No production database or schedule has been switched. Before cutover, quiesce Python workers and submissions, back up state and artifacts, and record the tested runtime, engine and adapter revisions. Go must become the sole lifecycle owner. Rollback requires quiescing Go and confirming no active workers remain before restoring Python ownership.
+The implementation is available for validation on separate synthetic databases. Before cutover, quiesce Python workers and submissions, back up state and artifacts, and record the tested runtime, engine and adapter revisions. Go must become the sole lifecycle owner. Rollback requires quiescing Go and confirming no active workers remain before restoring Python ownership.
 
 Lifecycle tests exercise queue persistence, bounded concurrency, cancellation, process cleanup and publication integrity. Continue to check deployment-specific historical fixtures and failure recovery before assigning production ownership. Keep the Python deployment available until those checks pass.
 
