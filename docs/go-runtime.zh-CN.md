@@ -26,6 +26,41 @@ CI 还会用固定源码版本构建的真实引擎运行 Go 协议测试。这�
 
 需要暂存不可变的本地发行目录时，可使用 `scripts/release.py stage COMMIT --implementation go`，同时按运维说明传入 `--repo` 和 `--production` 路径。提交必须已经进入 `origin/main`。工具构建 `bin/backtest-job`，通过 `version` 记录源码版本，构建成功后才写入就绪标记。暂存不会切换活动版本。工具默认仍使用 Python，兼容已有部署。
 
+## 检查待发布版本
+
+使用 Python 3.12 或更新版本运行 `scripts/smoke_native.py`。脚本只用标准库，无需安装 Python 运行时包。输入使用已审查引擎版本中的合成样例，输出放在源码之外的新目录。
+
+```sh
+python3 /releases/runtime/COMMIT/scripts/smoke_native.py \
+  --executable /releases/runtime/COMMIT/bin/backtest-job \
+  --expected-runtime-revision COMMIT \
+  --engine-executable /releases/engine/quant-backtest-engine \
+  --engine-request /releases/engine/fixtures/sessions.json \
+  --root /data/runtime-checks/unique-check
+```
+
+将 `COMMIT` 换成已合并的完整提交号。脚本先核对程序版本，再把带有预检哈希的任务放进队列。它检查重复提交和回执查询，取消第二个排队任务，然后运行调度器并读取已校验的结果。输出目录保留 `receipt.json` 和合成任务数据，便于排查。回执记录程序摘要与结果哈希。目录只要已经存在，脚本就会拒绝使用，包括空目录。检查通过只证明这份样例能跑通，样例的金融计算预期仍需另行核对。
+
+## 限制调度服务的资源
+
+主机如果支持 systemd 用户服务，并开放了内存和 CPU 控制器，可以用临时服务限制调度器及其子进程。先用合成任务验证，再确定实际任务的配置。
+
+```sh
+systemd-run --user --wait --pipe --collect \
+  --unit=runtime-native-check-UNIQUE \
+  -p MemoryMax=2G -p MemorySwapMax=0 -p CPUQuota=200% \
+  python3 /releases/runtime/COMMIT/scripts/smoke_native.py \
+  --executable /releases/runtime/COMMIT/bin/backtest-job \
+  --expected-runtime-revision COMMIT \
+  --engine-executable /releases/engine/quant-backtest-engine \
+  --engine-request /releases/engine/fixtures/sessions.json \
+  --root /data/runtime-checks/unique-cgroup-check
+```
+
+这里的数值用于合成检查。生产配置应按实际任务的内存峰值设置，并给调度器留出空间。核对服务所在 cgroup 的 `memory.max`、`memory.swap.max` 和 `cpu.max`，确认设置生效。还应在独立探测任务中让子进程申请超额内存，检查系统是否将它终止。探测数据要与实际任务分开。
+
+长期运行时，将 `backtest-job ... serve --concurrency N` 作为服务命令。服务之外只提交排队任务。调度器启动的 worker 会继承服务的 cgroup，其他进程直接提交并启动的任务不会自动归入其中。服务上限约束整个队列的进程树，每个任务另有计算子进程的虚拟地址空间上限。内存不足可能中断多个任务，重启后应检查残留进程并运行 `recover`。这套配置尚未提供逐任务的总内存计量。
+
 ## 提交原生任务
 
 通过 `--engine-executable` 传入已安装引擎的绝对路径，任务中的 `config.executable_sha256` 固定程序字节。runtime 打开程序、核对摘要，再通过保留的文件描述符执行。因此，替换路径不会换掉本次选中的 inode。部署时保持程序文件不可变，通过原子替换更新版本。

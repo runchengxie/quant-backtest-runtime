@@ -10,7 +10,9 @@
 
 ## 发布
 
-PR 合并后，拉取远端并记录完整提交号：
+下面的命令安装 Python 版本。发布 Go 版本时，使用 `stage COMMIT --implementation go`，按 [Go 使用指南](go-runtime.zh-CN.md)检查，再将调用路径改为 `current/bin/backtest-job`。Go 发布目录不会生成 `current/.venv/bin/backtest-job`，也不会自动安装旧协议适配器。切换实现前要先清点调用方。
+
+PR 合并后，拉取远端并记录完整提交号。
 
 ```bash
 git fetch origin
@@ -22,7 +24,7 @@ python scripts/release.py --repo . --production "$production_root" stage "$relea
 
 `stage` 只接受已经进入 `origin/main` 历史的提交。它将源码放入固定版本目录，再安装锁定的运行依赖，成功后写入 `.release-ready`。现有同名目录不会被覆盖。安装失败可能留下没有 `.release-ready` 的目录，`switch` 会拒绝它，再次 `stage` 也不会覆盖。清理或重试前应保留并检查该失败目录。
 
-使用待发布版本自身的脚本和可执行文件跑通合成数据，再切换：
+使用待发布版本自身的脚本和可执行文件跑通合成数据，再切换。
 
 ```bash
 "$production_root/releases/$release_sha/.venv/bin/python" \
@@ -34,7 +36,7 @@ python scripts/release.py --repo . --production "$production_root" switch "$rele
 
 生产调用使用 `current/.venv/bin/backtest-job` 并显式传入三个数据路径，无需设置 `PYTHONPATH`。运行中的 worker 继续使用启动时的解释器。清理旧版本前应确认没有进程仍在使用它。
 
-回滚前可以先预演：
+回滚前可以先预演。
 
 ```bash
 python scripts/release.py --repo . --production "$production_root" --dry-run rollback
@@ -42,6 +44,8 @@ python scripts/release.py --repo . --production "$production_root" rollback
 ```
 
 `previous` 为符号链接时回滚到上一版本。首次安装没有上一版本时，回滚会移除 `current` 指针，数据目录保持原样。
+
+回滚会使用上一版本的完整路径，也支持共享发布代次中的目录。工具先检查该目录的就绪标记和对应实现的可执行文件，通过后才修改指针。需要保留回滚能力时，应保留原发布代次及其 Python 环境。共享代次的指针由部署方统一协调。
 
 ## 故障排查
 
