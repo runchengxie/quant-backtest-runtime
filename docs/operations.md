@@ -10,6 +10,8 @@ The runtime accepts only its own SQLite database. A database from the legacy res
 
 ## Release
 
+The commands below install the Python implementation. For a Go release, use `stage COMMIT --implementation go`, validate with the [native release check](go-runtime.md#check-a-staged-release), and update callers to `current/bin/backtest-job`. Go staging does not create `current/.venv/bin/backtest-job` or install the optional legacy adapter. Inventory callers before switching between implementations.
+
 After merging a PR, record the full commit SHA and stage it with a dry run first:
 
 ```bash
@@ -42,6 +44,8 @@ python scripts/release.py --repo . --production "$production_root" rollback
 ```
 
 When `previous` is a symlink, rollback switches to that release. On a first installation without a previous release, rollback removes only the `current` pointer and leaves runtime data in place.
+
+Rollback preserves the exact resolved previous path, including a release under a shared generation directory. It validates that path's readiness marker and implementation-specific executable before changing either pointer. Keep the generation and its Python environment intact until rollback is no longer needed. Coordinate updates with the owner of shared generation pointers.
 
 Production calls use `current/.venv/bin/backtest-job` and pass the three data paths explicitly. Confirm that no worker still uses an old interpreter before removing a release.
 

@@ -95,6 +95,10 @@ def _install(destination: Path, sha: str, implementation: str) -> None:
 
 def switch(production: Path, commit: str, *, dry_run: bool) -> None:
     release = production / "releases" / commit
+    _activate(production, release, commit, dry_run=dry_run)
+
+
+def _activate(production: Path, release: Path, commit: str, *, dry_run: bool) -> None:
     marker = release / ".runtime-implementation"
     implementation = (
         marker.read_text(encoding="ascii").strip() if marker.is_file() else "python"
@@ -128,7 +132,8 @@ def rollback(production: Path, *, dry_run: bool) -> None:
         raise ValueError("no active release to roll back")
     previous = production / "previous"
     if previous.is_symlink():
-        switch(production, previous.resolve().name, dry_run=dry_run)
+        release = previous.resolve()
+        _activate(production, release, release.name, dry_run=dry_run)
     elif dry_run:
         print(f"would remove initial release pointer {current}")
     else:

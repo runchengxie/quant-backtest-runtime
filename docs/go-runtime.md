@@ -26,6 +26,41 @@ CI also runs native protocol tests against its pinned engine source revision. Th
 
 For an immutable local release, use `scripts/release.py stage COMMIT --implementation go` with the documented `--repo` and `--production` paths. The commit must already belong to `origin/main`. The helper builds `bin/backtest-job`, records the source revision in `version`, and writes the readiness marker after a successful build. Staging does not switch the active release. The helper retains Python as its default implementation for existing deployments.
 
+## Check a staged release
+
+Run `scripts/smoke_native.py` with Python 3.12 or newer. It uses only the standard library and needs no installed Python runtime package. Supply a synthetic fixture from the reviewed engine release and a new output directory outside the source tree.
+
+```sh
+python3 /releases/runtime/COMMIT/scripts/smoke_native.py \
+  --executable /releases/runtime/COMMIT/bin/backtest-job \
+  --expected-runtime-revision COMMIT \
+  --engine-executable /releases/engine/quant-backtest-engine \
+  --engine-request /releases/engine/fixtures/sessions.json \
+  --root /data/runtime-checks/unique-check
+```
+
+Replace `COMMIT` with the full merged runtime revision. The check compares the build identity before creating state, then submits a plan-bound queued job. It verifies duplicate submission and receipt lookup, cancels a second queued job, drains the queue, and asks the runtime to verify the published result. It leaves `receipt.json`, the synthetic database and artifacts for inspection. The receipt records executable digests and the result hash. Existing output directories are rejected, including empty ones. A passing check covers the supplied fixture; review its financial expectations separately.
+
+## Limit a scheduler service
+
+On a host with a working systemd user manager and memory/CPU controllers, a transient service can constrain the scheduler and its descendants together. Run the native check or an isolated queue within this service before using the settings for real jobs.
+
+```sh
+systemd-run --user --wait --pipe --collect \
+  --unit=runtime-native-check-UNIQUE \
+  -p MemoryMax=2G -p MemorySwapMax=0 -p CPUQuota=200% \
+  python3 /releases/runtime/COMMIT/scripts/smoke_native.py \
+  --executable /releases/runtime/COMMIT/bin/backtest-job \
+  --expected-runtime-revision COMMIT \
+  --engine-executable /releases/engine/quant-backtest-engine \
+  --engine-request /releases/engine/fixtures/sessions.json \
+  --root /data/runtime-checks/unique-cgroup-check
+```
+
+These values are an example for a synthetic check. Choose production limits from measured workload peaks and leave room for the scheduler. Verify the effective `memory.max`, `memory.swap.max` and `cpu.max` in the service's cgroup. A separate controlled allocation probe should verify that a child exceeding the memory boundary is killed. Keep its inputs and outputs isolated from real tasks.
+
+For a persistent queue, launch `backtest-job ... serve --concurrency N` as the service command. Submit only queued jobs from outside that service. Workers launched by the scheduler inherit its cgroup; immediate submissions from elsewhere do not. The service memory ceiling covers the whole queue process tree. Individual jobs retain their separate child address-space budgets. An out-of-memory event can interrupt several jobs, so inspect their processes and use `recover` after restarting. This arrangement does not establish per-job aggregate memory accounting.
+
 ## Submit a native job
 
 Pass the installed engine's absolute path through `--engine-executable`. The job's `config.executable_sha256` pins its bytes. The runtime hashes an open executable and executes that held descriptor, so replacing the path cannot select a different inode. Deploy immutable binaries and replace them atomically.

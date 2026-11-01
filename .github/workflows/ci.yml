@@ -38,7 +38,7 @@ jobs:
       - name: Check reachable Go dependency vulnerabilities
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
       - name: Build Go CLI outside the source tree
-        run: go build -race -o "$RUNNER_TEMP/backtest-job" ./cmd/backtest-job
+        run: go build -race -ldflags "-X github.com/runchengxie/quant-backtest-runtime/internal/app.SourceRevision=$GITHUB_SHA" -o "$RUNNER_TEMP/backtest-job" ./cmd/backtest-job
 
   test:
     runs-on: ubuntu-latest
@@ -90,7 +90,7 @@ jobs:
         with:
           go-version: "1.27.3"
       - name: Build Go CLI outside the source tree
-        run: go build -race -o "$RUNNER_TEMP/backtest-job" ./cmd/backtest-job
+        run: go build -race -ldflags "-X github.com/runchengxie/quant-backtest-runtime/internal/app.SourceRevision=$GITHUB_SHA" -o "$RUNNER_TEMP/backtest-job" ./cmd/backtest-job
       - run: uv sync --locked --extra legacy --group dev --python 3.13
       - name: Go protocol checks against the real engine
         env:
@@ -99,8 +99,9 @@ jobs:
       - name: Go lifecycle and legacy adapter integration
         env:
           BACKTEST_GO_EXECUTABLE: ${{ runner.temp }}/backtest-job
+          BACKTEST_EXPECTED_RUNTIME_REVISION: ${{ github.sha }}
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
-        run: uv run --locked --extra legacy pytest -q tests/test_go_runtime.py
+        run: uv run --locked --extra legacy pytest -q tests/test_go_runtime.py tests/test_native_smoke.py
       - name: Real Rust engine job and lifecycle checks
         env:
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
