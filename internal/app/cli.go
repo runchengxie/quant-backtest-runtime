@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/runchengxie/quant-backtest-runtime/internal/jobgroup"
 	"github.com/runchengxie/quant-backtest-runtime/internal/protocol"
 	"github.com/runchengxie/quant-backtest-runtime/internal/store"
 	"modernc.org/sqlite"
@@ -28,6 +29,8 @@ type Options struct {
 	Command, Argument, Key, ExpectedPlan                                   string
 	JSONErrors, Queue, Once                                                bool
 	Concurrency                                                            int
+	CgroupRoot                                                             string
+	groups                                                                 *jobgroup.Manager
 }
 type Error struct{ Code, Message string }
 
@@ -42,7 +45,7 @@ var capabilityBytes []byte
 
 func parse(args []string) (Options, error) {
 	o := Options{Concurrency: 1}
-	values := map[string]*string{"--database": &o.Database, "--artifact-root": &o.ArtifactRoot, "--result-root": &o.ResultRoot, "--engine-executable": &o.EngineExecutable, "--python-executable": &o.PythonExecutable, "--idempotency-key": &o.Key, "--expected-plan-sha256": &o.ExpectedPlan}
+	values := map[string]*string{"--database": &o.Database, "--artifact-root": &o.ArtifactRoot, "--result-root": &o.ResultRoot, "--engine-executable": &o.EngineExecutable, "--python-executable": &o.PythonExecutable, "--idempotency-key": &o.Key, "--expected-plan-sha256": &o.ExpectedPlan, "--cgroup-root": &o.CgroupRoot}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		v := ""
@@ -101,6 +104,9 @@ func parse(args []string) (Options, error) {
 				return o, failure("INVALID_ARGUMENTS", "unexpected argument")
 			}
 		}
+	}
+	if o.CgroupRoot != "" && o.Command != "serve" {
+		return o, failure("INVALID_ARGUMENTS", "cgroup-root is available only for the queue scheduler")
 	}
 	switch o.Command {
 	case "help", "capabilities", "version":
@@ -198,6 +204,7 @@ func dispatch(ctx context.Context, o Options) (any, error) {
 		m["implementation"] = "go"
 		m["source_revision"] = SourceRevision
 		m["resource_limits"] = map[string]any{"memory_mb_scope": "backend_child_address_space", "go_orchestration_memory_included": false, "whole_job_memory_parity": "not_established", "queue_concurrency_scope": "scheduler_managed_jobs"}
+		m["resource_limits"].(map[string]any)["optional_job_cgroup"] = map[string]any{"option": "serve --cgroup-root", "memory_mb_scope": "worker_and_descendants_physical_memory", "swap_max_bytes": 0, "oom_group": true, "failure_mode": "fail_closed"}
 		operations, _ := m["operations"].([]any)
 		m["operations"] = append(operations, queueCapability())
 		return m, nil

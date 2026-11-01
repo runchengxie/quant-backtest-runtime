@@ -66,9 +66,30 @@ func startWorker(o Options, st *store.Store, id string) (*exec.Cmd, error) {
 		}
 	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	if o.groups != nil {
+		job, err := st.Get(id)
+		if err != nil {
+			return nil, err
+		}
+		r, err := persistedEnvelope(job)
+		if err != nil {
+			return nil, err
+		}
+		group, err := o.groups.Create(id, r.Budgets.MemoryMB)
+		if err != nil {
+			return nil, failure("RESOURCE_LIMIT_UNAVAILABLE", err.Error())
+		}
+		defer group.Close()
+		cmd.SysProcAttr.UseCgroupFD = true
+		cmd.SysProcAttr.CgroupFD = int(group.Fd())
+	}
 	// Scheduler death recovery uses persisted leases. Detached workers survive the short CLI parent.
 	// A running scheduler always waits for every child, including graceful shutdown.
 	if e = cmd.Start(); e != nil {
+		if o.groups != nil {
+			_, _ = o.groups.Cleanup(id)
+			return nil, failure("RESOURCE_LIMIT_UNAVAILABLE", e.Error())
+		}
 		return nil, e
 	}
 	return cmd, nil

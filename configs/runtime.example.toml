@@ -1,0 +1,13 @@
+[runtime]
+executable = "/srv/quant-backtest-runtime/current/bin/backtest-job"
+database = "/data/quant-backtest-runtime/jobs.sqlite"
+artifact_root = "/data/quant-backtest-runtime/artifacts"
+result_root = "/data/quant-backtest-runtime/results"
+engine_executable = "/srv/quant-backtest-engine/releases/ENGINE_REVISION/quant-backtest-engine"
+# Set only when legacy v1-v4 computation is needed.
+# python_executable = "/srv/quant-backtest-runtime/adapters/RUNTIME_REVISION/bin/python"
+queue = true
+
+[scheduler]
+concurrency = 1
+cgroup_root = "auto"

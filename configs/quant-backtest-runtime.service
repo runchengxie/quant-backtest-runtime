@@ -1,0 +1,20 @@
+[Unit]
+Description=Go backtest queue with per-job memory limits
+
+[Service]
+Type=exec
+ExecStart=/usr/bin/python3 /srv/quant-backtest-runtime/current/scripts/serve_config.py --config /etc/quant-backtest-runtime/runtime.toml
+Delegate=memory
+DelegateSubgroup=supervisor
+MemoryMax=8G
+MemorySwapMax=0
+CPUQuota=200%
+OOMPolicy=continue
+KillMode=control-group
+TimeoutStopSec=300
+Restart=on-failure
+RestartSec=5
+UMask=0077
+
+[Install]
+WantedBy=default.target

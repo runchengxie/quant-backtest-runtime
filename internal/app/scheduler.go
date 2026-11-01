@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/runchengxie/quant-backtest-runtime/internal/jobgroup"
 	"github.com/runchengxie/quant-backtest-runtime/internal/store"
 	"github.com/runchengxie/quant-backtest-runtime/internal/supervisor"
 	"golang.org/x/sys/unix"
@@ -47,6 +48,13 @@ type completion struct {
 }
 
 func serve(ctx context.Context, o Options) error {
+	if o.CgroupRoot != "" {
+		var err error
+		o.groups, err = jobgroup.New(o.CgroupRoot, o.Database)
+		if err != nil {
+			return failure("RESOURCE_LIMIT_UNAVAILABLE", err.Error())
+		}
+	}
 	st, e := store.Open(o.Database, false)
 	if e != nil {
 		return e
@@ -89,6 +97,9 @@ func serve(ctx context.Context, o Options) error {
 		if ctx.Err() != nil {
 			stopping = true
 		}
+		if e = reconcileGroups(o, st, running, observed); e != nil {
+			return e
+		}
 		if _, e = recoverJobs(st, o); e != nil {
 			return e
 		}
@@ -102,15 +113,28 @@ func serve(ctx context.Context, o Options) error {
 					return err
 				}
 				if j.Status == "RUNNING" || j.Status == "SUBMITTED" {
+					code := "WORKER_EXITED"
+					if o.groups != nil {
+						stats, err := o.groups.Inspect(j.JobID)
+						if err != nil {
+							return err
+						}
+						if stats.OOMKill > 0 {
+							code = "JOB_MEMORY_EXCEEDED"
+						}
+					}
 					state := "FAILED"
 					if j.CancelRequestedAt != nil {
 						state = "CANCELLED"
 					}
-					_, err = st.Finish(j.JobID, state, "", "", "WORKER_EXITED", "worker exited without completing state")
+					_, err = st.Finish(j.JobID, state, "", "", code, "worker exited without completing state")
 					if err != nil {
 						return err
 					}
 					removeOutput(o, j.JobID)
+				}
+				if err = finishGroup(o, j.JobID); err != nil {
+					return err
 				}
 			default:
 				drain = false
@@ -163,7 +187,12 @@ func serve(ctx context.Context, o Options) error {
 				}
 				command, err := startWorker(o, st, j.JobID)
 				if err != nil {
-					_, _ = st.Finish(j.JobID, "FAILED", "", "", "WORKER_START_FAILED", err.Error())
+					code := "WORKER_START_FAILED"
+					var typed *Error
+					if errors.As(err, &typed) {
+						code = typed.Code
+					}
+					_, _ = st.Finish(j.JobID, "FAILED", "", "", code, err.Error())
 					continue
 				}
 				if command == nil {
