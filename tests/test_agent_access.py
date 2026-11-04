@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sqlite3
 from dataclasses import asdict
+from pathlib import Path
 
 import pytest
 from test_execution_aware import _request_v2
@@ -317,13 +319,15 @@ def test_legacy_plan_and_request_golden_identities(
 ):
     # Captured from d2f20b4 before v5 validation was added, using locked synthetic
     # fixtures. A new v5 receipt must never change an earlier protocol's identity.
-    from test_sequenced_jobs import _request_v3
-    from test_trade_accounting_jobs import _request_v4
-
     from backtest_runtime.agent_access import checked_plan
 
-    factory = {1: _request_v2, 2: _request_v2, 3: _request_v3, 4: _request_v4}[version]
-    mapping = factory(tmp_path)
+    # Freeze input bytes as well as expected protocol digests: Parquet writers may
+    # change serialization when pandas or Arrow changes, without a protocol change.
+    fixture = (
+        Path(__file__).parent / "fixtures" / "legacy-golden" / f"v{max(2, version)}"
+    )
+    mapping = json.loads((fixture / "request.json").read_text())
+    shutil.copytree(fixture / "sha256", tmp_path / "sha256")
     if version == 1:
         mapping["schema_version"] = 1
         mapping.pop("producer")
@@ -332,3 +336,22 @@ def test_legacy_plan_and_request_golden_identities(
     request = BacktestJobRequest.from_mapping(mapping)
     assert request.request_sha256 == request_sha256
     assert checked_plan(request, tmp_path, None)["plan_sha256"] == plan_sha256
+
+
+def test_legacy_golden_fixture_provenance():
+    from hashlib import sha256
+
+    import pyarrow.parquet as pq
+
+    root = Path(__file__).parent / "fixtures" / "legacy-golden"
+    provenance = json.loads((root / "provenance.json").read_text())
+    assert provenance["baseline_pandas"] == "2.3.3"
+    assert provenance["baseline_pyarrow"] == "25.0.1"
+    for path in root.glob("v*/sha256/*"):
+        assert sha256(path.read_bytes()).hexdigest() == path.name
+    for relative, expected in provenance["parquet"].items():
+        table = pq.read_table(root / relative)
+        assert [
+            {"name": field.name, "type": str(field.type)} for field in table.schema
+        ] == expected["schema"]
+        assert table.to_pylist() == expected["rows"]

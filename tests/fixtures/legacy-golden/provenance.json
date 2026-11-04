@@ -1,0 +1,246 @@
+{
+  "baseline_pandas": "2.3.3",
+  "baseline_pyarrow": "25.0.1",
+  "parquet": {
+    "v4/sha256/b39cbda707bffa3d29fea253ba97bdc5963a8fc66dea24bda8b5ca15c6d51e42": {
+      "schema": [
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "previous_weight",
+          "type": "double"
+        },
+        {
+          "name": "target_weight",
+          "type": "double"
+        },
+        {
+          "name": "previous_price",
+          "type": "double"
+        },
+        {
+          "name": "current_price",
+          "type": "double"
+        },
+        {
+          "name": "tradable",
+          "type": "bool"
+        }
+      ],
+      "rows": [
+        {
+          "symbol": "A",
+          "previous_weight": 0.5,
+          "target_weight": 0.5,
+          "previous_price": 10.0,
+          "current_price": 20.0,
+          "tradable": true
+        },
+        {
+          "symbol": "B",
+          "previous_weight": 0.5,
+          "target_weight": 0.5,
+          "previous_price": 10.0,
+          "current_price": 10.0,
+          "tradable": true
+        }
+      ]
+    },
+    "v3/sha256/2fd28f918f34842179d9420f4e40d9014a56ad531f7ca552b3642f11e59ed02d": {
+      "schema": [
+        {
+          "name": "rebalance_date",
+          "type": "string"
+        },
+        {
+          "name": "entry_date",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "weight",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        {
+          "rebalance_date": "20260102",
+          "entry_date": "20260105",
+          "symbol": "AAA",
+          "weight": 1.0
+        },
+        {
+          "rebalance_date": "20260106",
+          "entry_date": "20260107",
+          "symbol": "BBB",
+          "weight": 1.0
+        }
+      ]
+    },
+    "v3/sha256/2b69015712d6c7a7e1aedf24d96175923f368eff8027ac9fae0ff2fa07c29a8a": {
+      "schema": [
+        {
+          "name": "trade_date",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "close",
+          "type": "double"
+        },
+        {
+          "name": "amount",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        {
+          "trade_date": "20260105",
+          "symbol": "AAA",
+          "close": 100.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260106",
+          "symbol": "AAA",
+          "close": 102.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260107",
+          "symbol": "AAA",
+          "close": 103.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260108",
+          "symbol": "AAA",
+          "close": 104.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260105",
+          "symbol": "BBB",
+          "close": 50.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260106",
+          "symbol": "BBB",
+          "close": 51.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260107",
+          "symbol": "BBB",
+          "close": 52.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260108",
+          "symbol": "BBB",
+          "close": 53.0,
+          "amount": 10000000.0
+        }
+      ]
+    },
+    "v2/sha256/d38ebfe5b54e6ef9278f53f4afb047ed63d87ba0de68e07d9549b734a73f545f": {
+      "schema": [
+        {
+          "name": "rebalance_date",
+          "type": "string"
+        },
+        {
+          "name": "entry_date",
+          "type": "string"
+        },
+        {
+          "name": "exit_date",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "rebalance_date": "20260102",
+          "entry_date": "20260105",
+          "exit_date": "20260106"
+        }
+      ]
+    },
+    "v2/sha256/5680d67d2c05dcd253c83373645b0ec458f82b6500dda4fa61f5dad0777ca0b4": {
+      "schema": [
+        {
+          "name": "trade_date",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "close",
+          "type": "double"
+        },
+        {
+          "name": "amount",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        {
+          "trade_date": "20260105",
+          "symbol": "AAA",
+          "close": 100.0,
+          "amount": 10000000.0
+        },
+        {
+          "trade_date": "20260106",
+          "symbol": "AAA",
+          "close": 105.0,
+          "amount": 10000000.0
+        }
+      ]
+    },
+    "v2/sha256/5dbeff0b5589f1791afebd0d75cb94051a491a35b97818847c73693d14e66ebc": {
+      "schema": [
+        {
+          "name": "rebalance_date",
+          "type": "string"
+        },
+        {
+          "name": "entry_date",
+          "type": "string"
+        },
+        {
+          "name": "symbol",
+          "type": "string"
+        },
+        {
+          "name": "weight",
+          "type": "double"
+        },
+        {
+          "name": "side",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        {
+          "rebalance_date": "20260102",
+          "entry_date": "20260105",
+          "symbol": "AAA",
+          "weight": 1.0,
+          "side": "long"
+        }
+      ]
+    }
+  }
+}

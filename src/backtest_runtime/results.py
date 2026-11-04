@@ -95,8 +95,11 @@ def _verify_trade_accounting(
     import pandas as pd
 
     # Keep Arrow Python-object cleanup within the live one-shot interpreter.
-    options = {"use_threads": False, "pre_buffer": False} if synchronous_parquet else {}
-    frame = pd.read_parquet(path, **options)
+    frame = (
+        pd.read_parquet(path, use_threads=False, pre_buffer=False)
+        if synchronous_parquet
+        else pd.read_parquet(path)
+    )
     if len(frame) != 1 or frame.iloc[0].to_dict() != summary:
         raise ValueError("trade accounting summary does not match verified frame")
 

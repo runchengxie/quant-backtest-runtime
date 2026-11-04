@@ -34,7 +34,11 @@ Coverage includes statements and branches and combines data from Python subproce
 
 Tests cover request fingerprints and idempotency, competing state updates, cancellation, timeouts, startup failures, lease recovery, result tampering, and v1-v4 subprocess replays, including sequenced execution and trade-accounting result checks. `scripts/smoke_backtest.py` verifies that the installed CLI, independent worker, and synthetic example work together.
 
+The v1–v4 protocol golden tests use immutable synthetic inputs in `tests/fixtures/legacy-golden`, captured from baseline revision `ab0de9e` with pandas 2.3.3 and PyArrow 25.0.1. Artifact filenames are their SHA-256 digests; `provenance.json` records the decoded Parquet schema and rows. Tests verify all bytes, schemas and values while preserving the original request and plan digests. Do not regenerate these fixtures when serialization libraries change. Other replay tests continue to write and read with the current libraries.
+
 ## Dependency audit
+
+The legacy extra keeps quant-platform at reviewed compatibility baseline `15ec62b66e894395d694049eaaace931de4a1265`. Upgrade that provider only after its own dependency refresh is reviewed, merged and validated against these legacy protocols; package upgrades here do not select an arbitrary provider head.
 
 `pip-audit --local` audits known vulnerabilities in the installed environment. Local source or Git dependencies may be skipped by the vulnerability database. Fixed commits, code review, and project tests remain part of their security boundary.
 
