@@ -62,5 +62,6 @@ Go 与 Python 任务管理程序不能同时管理同一个数据库。
 
 - [Go 使用指南](docs/go-runtime.zh-CN.md)。提交任务、运行常驻队列、设置资源限制
 - [任务与结果](docs/jobs.zh-CN.md)。请求、状态与结果校验
+- [会话进程通道](docs/session-stream.zh-CN.md)。显式启用的 Python 流式调用与重放恢复
 - [开发指南](docs/development.zh-CN.md)。依赖与必需检查
 - [运维指南](docs/operations.zh-CN.md)。发布、回滚与故障排查
