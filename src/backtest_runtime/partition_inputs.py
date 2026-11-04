@@ -233,7 +233,7 @@ def _finite_float(value: str) -> float:
 def _parse(line: bytes) -> tuple[dict[str, Any], tuple[int, int]]:
     try:
         data = json.loads(
-            line,
+            line.decode("utf-8", errors="strict"),
             object_pairs_hook=_no_duplicates,
             parse_constant=_bad_constant,
             parse_float=_finite_float,

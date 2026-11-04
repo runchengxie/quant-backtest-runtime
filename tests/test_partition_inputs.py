@@ -232,3 +232,13 @@ def test_strict_json_and_payload_shape(tmp_path, raw):
     source, _ = reader(tmp_path, [[event(1)]], raw)
     with pytest.raises(ValueError):
         next(source.iter_rows())
+
+
+@pytest.mark.parametrize("encoding", ["utf-16-be", "utf-32-be"])
+def test_non_utf8_json_is_rejected_before_first_delivery(tmp_path, encoding):
+    # json.loads(bytes) autodetects these encodings; NDJSON v1 requires UTF-8.
+    raw = (json.dumps(event(1)) + "\n").encode(encoding)
+    source, _ = reader(tmp_path, [[event(1)]], raw)
+    with pytest.raises(ValueError):
+        next(source.iter_rows())
+    assert list((tmp_path / "task").iterdir()) == []
