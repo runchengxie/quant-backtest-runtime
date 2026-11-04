@@ -122,7 +122,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: runchengxie/quant-backtest-engine
-          ref: 18a38978e31ac757b884f1696d0691d7a0c78f3f
+          ref: 3a241c57e1c8764fe34ccb43c61ab9985ba46919
           path: .stream-engine-source
       - uses: dtolnay/rust-toolchain@1.99.0
       - uses: Swatinem/rust-cache@v2
