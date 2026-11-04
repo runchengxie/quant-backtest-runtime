@@ -10,7 +10,7 @@ No gateway, worker, CLI or capability currently advertises this proposal.
 A future versioned engine consumer could accept a manifest digest plus explicitly
 operator-approved input and task roots, validate financial payload schemas, and
 consume [verified partition input v1](../partition-inputs-v1.md). Runtime would own
-reference validation and bounded I/O; the financial engine would own matching,
+reference validation and bounded I/O. The financial engine would own matching,
 accounting, information visibility and checkpoint compatibility. Job controls,
 resource budgets, cancellation and publication verification must stay authoritative.
 

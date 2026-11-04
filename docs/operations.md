@@ -12,7 +12,7 @@ The runtime accepts only its own SQLite database. A database from the legacy res
 
 The commands below install the Python implementation. For a Go release, use `stage COMMIT --implementation go`, validate with the [native release check](go-runtime.md#check-a-staged-release), and update callers to `current/bin/backtest-job`. Go staging does not create `current/.venv/bin/backtest-job` or install the optional legacy adapter. Inventory callers before switching between implementations.
 
-After merging a PR, record the full commit SHA and stage it with a dry run first:
+After merging a PR, record the full commit SHA and stage it with a dry run first.
 
 ```bash
 git fetch origin
@@ -24,9 +24,9 @@ python scripts/release.py --repo . --production "$production_root" stage "$relea
 
 `stage` accepts only commits already present in `origin/main`. It installs locked dependencies in a versioned directory and writes `.release-ready` after success. Existing release directories are never overwritten.
 
-An installation failure can leave a directory without `.release-ready`; `switch` rejects it and another `stage` does not overwrite it. Preserve and inspect the failed directory before any task-specific cleanup or retry.
+An installation failure can leave a directory without `.release-ready`. `switch` rejects it and another `stage` does not overwrite it. Preserve and inspect the failed directory before any task-specific cleanup or retry.
 
-Run the synthetic data check from the staged release before switching:
+Run the synthetic data check from the staged release before switching.
 
 ```bash
 "$production_root/releases/$release_sha/.venv/bin/python" \
@@ -36,7 +36,7 @@ python scripts/release.py --repo . --production "$production_root" --dry-run swi
 python scripts/release.py --repo . --production "$production_root" switch "$release_sha"
 ```
 
-Rollback can also be previewed before execution:
+Rollback can also be previewed before execution.
 
 ```bash
 python scripts/release.py --repo . --production "$production_root" --dry-run rollback
@@ -55,7 +55,7 @@ Production calls use `current/.venv/bin/backtest-job` and pass the three data pa
 | --- | --- |
 | `WORKER_START_FAILED` | Interpreter, permissions, and log directory |
 | `WORKER_START_EXPIRED` | Worker stderr in `.logs` after startup |
-| `JOB_TIMEOUT` | Input size and time budget; resubmit with a new idempotency key |
+| `JOB_TIMEOUT` | Input size and time budget. Resubmit with a new idempotency key |
 | `RESOURCE_LIMIT_UNAVAILABLE` | Linux resource-limit support and permissions |
 | `INPUT_ARTIFACT_MISSING` | Input directory and hash references |
 | `BACKTEST_REJECTED` | Parameters, input data, and research-clock range |
@@ -63,12 +63,12 @@ Production calls use `current/.venv/bin/backtest-job` and pass the three data pa
 | `RUNNING` after cancellation | Query status, run `recover` if needed, and inspect `/proc` visibility |
 | Result hash mismatch | Preserve the file and logs, then regenerate the input or job |
 
-Back up SQLite using its consistency-safe backup method and preserve the input and result directories together. Backup and cleanup scheduling belongs to the deployment environment; this repository does not provide a resident backup service.
+Back up SQLite using its consistency-safe backup method and preserve the input and result directories together. Backup and cleanup scheduling belongs to the deployment environment. This repository does not provide a resident backup service.
 
 ## Publication fault recovery
 
 Result-directory publication and SQLite success are separate boundaries. A renamed
 directory is not a successful result until the job state commits. Lease expiry
-treats unfinished jobs conservatively; it never adopts a directory as success.
+treats unfinished jobs conservatively. It never adopts a directory as success.
 Repeated recovery also retries cleanup for expired failed jobs, including after a
 cleanup interruption. Unrelated directories and processes remain outside cleanup.

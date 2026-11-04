@@ -6,7 +6,7 @@ Go 实现使用 Go 1.27.3，并锁定 `go.mod` 和 `go.sum`。需要运行 gofmt
 
 ## 本地检查
 
-在独立任务 worktree 根目录执行：
+在独立任务 worktree 根目录执行。
 
 ```bash
 uv sync --locked --extra legacy --group dev --python 3.13
@@ -61,25 +61,25 @@ coverage 同时统计语句和分支，并启用 Python 子进程采集。独立
 
 新增 `nautilus.quote_market_orders` 后端，调用独立的
 [quant-backtest-engine](https://github.com/runchengxie/quant-backtest-engine)。
-旧 v1–v4 的规范化和请求指纹保持不变，新版本只提供 diagnostic 最终快照，
+旧 v1 至 v4 的规范化和请求指纹保持不变，新版本只提供 diagnostic 最终快照，
 不能当作 v2 的完整每日执行账本。
 
-由运维通过 `--engine-executable` 指定绝对路径；请求只能通过
+由运维通过 `--engine-executable` 指定绝对路径。请求只能通过
 `config.executable_sha256` 固定二进制内容，不能提交任意命令。
 `inputs.engine_request_ref` 引用标准 SHA-256 目录中的不可变引擎 JSON 请求，
 `execution` 为空对象。完整请求示例与命令见本页对应的
 [英文说明](development.md#independent-rust-engine-jobs-v5)。
 
-Python worker 继续独占 SQLite 状态和结果发布；Rust 子进程继承地址空间限制，
+Python worker 继续独占 SQLite 状态和结果发布。Rust 子进程继承地址空间限制，
 取消和超时会终止并回收它，父进程被硬杀时使用 Linux parent-death SIGKILL 清理。
 这只面向当前单线程 Linux worker，不宣称能安全运行不可信程序。
 二进制哈希固定的是构建字节，部署记录仍需保存源提交和工具链。
 
 结果采用独立的 `quant.engine_job_result.v1` 清单，包含 engine_result.json、
-大小、哈希和资金摘要；读取时重新核对完整性。任务成功不代表所有订单都成交。
+大小、哈希和资金摘要。读取时重新核对完整性。任务成功不代表所有订单都成交。
 A 股交易规则和日频账本尚未完成新引擎兼容验证，不能自动切换旧任务。
 
-设置 `BACKTEST_ENGINE_TEST_EXECUTABLE` 可运行真实引擎集成测试；专门的 CI
+设置 `BACKTEST_ENGINE_TEST_EXECUTABLE` 可运行真实引擎集成测试。专门的 CI
 会构建固定的已合并提供方提交并验证，其他测试覆盖超时、取消、父进程硬杀和非法输出。
 
 
@@ -88,22 +88,22 @@ A 股交易规则和日频账本尚未完成新引擎兼容验证，不能自动
 `plan` 和绑定计划摘要的 `submit` 在打开任务数据库前调用引擎的 `validate -`，
 不运行回测，也不创建任务或临时输出。输入最多 1 MiB，读取后校验摘要，再把同一份字节
 送入已经校验 SHA-256 的可执行文件。进程通过保持打开的文件描述符启动，环境变量受限，
-先通过同一描述符调用 `capabilities`，确认 `validator_version=1`，再校验请求；
+先通过同一描述符调用 `capabilities`，确认 `validator_version=1`，再校验请求。
 两次调用共用 10 秒期限，每次的标准输出和错误输出各限 8 KiB。超限或超时会终止并回收进程。
 
 成功的 v5 计划把 `engine_request_semantics` 标为 `passed`，并把
 `engine_validation.v1` 回执（`validator_version=1` 和输入摘要）纳入计划摘要。
-语义错误返回 `ENGINE_REQUEST_INVALID`；不兼容的引擎、错误回执或进程故障返回
-`ENGINE_VALIDATION_UNAVAILABLE`，不会退回未检查状态。v1–v4 的计划摘要和所有请求指纹
-保持兼容。部署必须使用不可原地修改的引擎文件：描述符只能防止路径替换，不能防止
+语义错误返回 `ENGINE_REQUEST_INVALID`。不兼容的引擎、错误回执或进程故障返回
+`ENGINE_VALIDATION_UNAVAILABLE`，不会退回未检查状态。v1 至 v4 的计划摘要和所有请求指纹
+保持兼容。部署必须使用不可原地修改的引擎文件。描述符只能防止路径替换，不能防止
 对已打开文件的原地写入。执行阶段仍会重新核验输入、引擎和请求语义。
 
 
 ## 逐日账本任务（v6）
 
 v6 使用 nautilus.session_replay，输入是不可变的 engine_request.v2 JSON。
-其余任务字段沿用 v5：固定二进制 SHA-256、空 execution 对象和明确的资源预算。
-旧 v1–v5 的规范化与指纹不变，能力发现和无副作用预检增加 v6。
+其余任务字段沿用 v5，需要固定二进制 SHA-256，并提供空 execution 对象和明确的资源预算。
+旧 v1 至 v5 的规范化与指纹不变，能力发现和无副作用预检增加 v6。
 
 worker 保留相同的子进程控制和唯一发布职责，结果采用 quant.engine_job_result.v2。
 发布前校验币种、原始价、时区、T+1 标志、交易日覆盖、订单与成交数量、拒单原因，
@@ -122,7 +122,7 @@ CI 固定已合并提供方 341de0177bc3e6b95ff8b4abb8c80c83eaedf207，同时验
 
 基础包没有 Python 运行时依赖，支持 v5/v6 Rust 任务、SQLite 生命周期管理、
 引擎结果校验，以及 agent 能力查询和预检。请单独安装经过审查的引擎可执行文件，
-通过 `--engine-executable` 传入绝对路径：
+通过 `--engine-executable` 传入绝对路径。
 
 ```sh
 pip install quant-backtest-runtime
@@ -130,7 +130,7 @@ pip install quant-backtest-runtime
 uv sync --locked --group dev
 ```
 
-v1-v4 执行、旧结果读取和 `quant_run_manifest_ref` 校验需要显式安装兼容扩展：
+v1-v4 执行、旧结果读取和 `quant_run_manifest_ref` 校验需要显式安装兼容扩展。
 
 ```sh
 pip install 'quant-backtest-runtime[legacy]'
@@ -139,7 +139,7 @@ uv sync --locked --extra legacy --group dev
 
 该扩展将 quant-platform 固定到经过审查的 Git 提交，需要 Git 访问权限。
 `dev` 依赖组不会自动启用它。缺少依赖时返回 `LEGACY_DEPENDENCY_UNAVAILABLE`
-和安装提示；CLI 的 plan 和 submit 会在创建状态之前拒绝请求。
+和安装提示。CLI 的 plan 和 submit 会在创建状态之前拒绝请求。
 依赖预检只检查包是否存在，不导入 pandas 或组合回测代码，也不证明后端兼容性或
 请求语义正确。v1-v6 请求指纹、计划内容和持久化状态协议保持不变。
 v6 计划仍将引擎语义标为 `not_checked`，v5 使用引擎提供的静态校验。
