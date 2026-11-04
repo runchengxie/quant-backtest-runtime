@@ -227,8 +227,30 @@ def _dead(pid: int) -> bool:
     path = Path("/proc") / str(pid) / "status"
     try:
         return "State:\tZ" in path.read_text()
-    except FileNotFoundError:
+    except (FileNotFoundError, ProcessLookupError):
         return True
+
+
+@pytest.mark.parametrize("error", [FileNotFoundError, ProcessLookupError])
+def test_dead_probe_accepts_a_process_disappearing_during_status_read(
+    monkeypatch: pytest.MonkeyPatch, error: type[OSError]
+) -> None:
+    def vanished(_path: Path) -> str:
+        raise error("process exited while reading status")
+
+    monkeypatch.setattr(Path, "read_text", vanished)
+    assert _dead(12345)
+
+
+def test_dead_probe_keeps_unexpected_read_failures_visible(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def denied(_path: Path) -> str:
+        raise PermissionError("status is inaccessible")
+
+    monkeypatch.setattr(Path, "read_text", denied)
+    with pytest.raises(PermissionError):
+        _dead(12345)
 
 
 @pytest.mark.parametrize("hard_kill", [False, True])
