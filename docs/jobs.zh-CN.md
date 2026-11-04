@@ -106,6 +106,15 @@ v1 和 v3 结果包含五张诊断表。v2 结果包含平台的 `portfolio_back
 
 回测任务成功表示结果已完成发布并校验。v2 提供 `quant_run_manifest_ref` 时，`result` 会校验复制文件的哈希、typed 结构及研究运行 ID，不会重新读取外部输入库中的组件文件；组件文件在提交和 worker 校验时检查。研究运行 ID 与运行时任务 UUID 是不同身份。研究晋升仍需要研究侧完成来源核对和人工审批；运行时不会自动晋升策略。
 
+新发布的 v1/v2 清单增加 `metric_basis` 对象，版本为
+`quant.result_metric_basis.v1`。v1 的 `summary` 和 `performance` 标为
+`period_return_replay`，即使启用了执行账本也保留历史区间收益口径，不能当作模拟成交后的收益。
+后端实际生成执行账本时，`daily_ledger` 标为 `execution_sim`，否则为 `not_available`。
+v2 只发布正式执行账本包，不发布后端的区间收益摘要和绩效表，因此 `summary` 和
+`performance` 标为 `not_published`，`daily_ledger` 标为 `execution_sim`。
+正式结果包格式保持不变，缺少此对象的历史清单仍可读取。比较收益或将结果用于执行证据之前，
+调用方应先区分这些口径。
+
 ## Agent 调用
 
 `backtest-job capabilities` 无需数据路径，返回带权限、副作用和重试说明的

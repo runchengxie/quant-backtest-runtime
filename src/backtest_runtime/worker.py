@@ -213,6 +213,18 @@ def _manifest_for_result(
     }
 
 
+def _add_legacy_metric_basis(
+    manifest: dict[str, Any], result: Any, version: int
+) -> None:
+    if version in {1, 2} and result.backend_name == "native.position_replay":
+        manifest["metric_basis"] = {
+            "schema_version": "quant.result_metric_basis.v1",
+            "summary": "period_return_replay" if version == 1 else "not_published",
+            "performance": "period_return_replay" if version == 1 else "not_published",
+            "daily_ledger": result.metadata["daily_ledger"],
+        }
+
+
 def _frame_dates(frame: Any, column: str) -> list[date]:
     if frame.empty:
         return []
@@ -385,6 +397,7 @@ def _write_result(
                     }
                 )
             manifest["inventory"] = inventory
+        _add_legacy_metric_basis(manifest, result, request.schema_version)
         manifest_path = tmp_dir / "manifest.json"
         manifest_path.write_text(
             json.dumps(

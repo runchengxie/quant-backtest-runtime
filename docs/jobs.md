@@ -94,6 +94,17 @@ The worker publishes results to a task-specific directory and stores a manifest 
 
 v1 and v3 results contain five diagnostic tables. v2 contains the platform `portfolio_backtester.backtest_result.v1` result package. v4 contains a one-row cost table. A successful job means that its result has been published and validated; it does not promote a strategy. Research promotion still requires source review and human approval in the research layer.
 
+New v1/v2 manifests include an additive `metric_basis` object with
+`schema_version=quant.result_metric_basis.v1`. In v1, `summary` and `performance`
+are `period_return_replay`, including when an execution ledger is enabled. They
+retain historical period-return values; they do not measure the simulated fills.
+`daily_ledger` is `execution_sim` when the backend produced that ledger and
+`not_available` otherwise. v2 publishes only the official execution ledger bundle,
+so its `summary` and `performance` labels are `not_published` and its
+`daily_ledger` label is `execution_sim`. The official bundle format is unchanged.
+Older manifests without this object remain readable. Consumers must distinguish
+these bases before comparing returns or using them as execution evidence.
+
 For v2's copied `QuantRunManifest`, `result` verifies the file hash, typed structure and research run ID. It does not reread component files from the external input store; those were checked at submission and worker validation. The research run ID and runtime job UUID are separate identities.
 
 ## Agent access
