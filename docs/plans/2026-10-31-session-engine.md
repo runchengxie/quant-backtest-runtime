@@ -7,6 +7,6 @@ pinning and process lifecycle. Preserve v1-v5 normalization, budgets and state w
 
 Validate result/session identity, exact decimal record/ledger reconciliation,
 request binding, active T+1, complete rejection evidence and verified publication.
-Expose v6 in discovery/preflight. Use a separately versioned manifest; never present
+Expose v6 in discovery/preflight. Use a separately versioned manifest. Never present
 it as a fully mapped research execution-aware bundle. Retain Python for corporate
 action/receivable/delisting gaps. Tests first, full checks, independent review, then PR.

@@ -15,15 +15,15 @@ Go implements CLI lifecycle management, SQLite state, persistent single-machine 
 | Legacy financial computation and normalization | Optional stateless Python adapter |
 | Strategies, research provenance and promotion rules | Research repository |
 
-Go's native v5/v6 path runs without Python. Legacy operations use an explicitly configured interpreter with `quant-backtest-runtime[legacy]` installed. The adapter writes staged artifacts and returns computation results; it does not manage SQLite or publish final directories. The existing Python CLI remains available for compatibility and rollback, with exclusive ownership of any database assigned to it.
+Go's native v5/v6 path runs without Python. Legacy operations use an explicitly configured interpreter with `quant-backtest-runtime[legacy]` installed. The adapter writes staged artifacts and returns computation results. It does not manage SQLite or publish final directories. The existing Python CLI remains available for compatibility and rollback, with exclusive ownership of any database assigned to it.
 
-Ordinary `submit` immediately starts a detached worker. Queue scheduling uses `submit --queue` and `serve --concurrency N`; use a dedicated queue database and one scheduler. Do not mix these modes. The limit covers scheduler-managed workers, and a slot is held through process reaping. See [Go runtime usage](go-runtime.md) for commands and deployment steps.
+Ordinary `submit` immediately starts a detached worker. Queue scheduling uses `submit --queue` and `serve --concurrency N`. Use a dedicated queue database and one scheduler. Do not mix these modes. The limit covers scheduler-managed workers, and a slot is held through process reaping. See [Go runtime usage](go-runtime.md) for commands and deployment steps.
 
 ## Process and protocol boundaries
 
 The runtime opens and hashes executable bytes, then executes through the held descriptor. A reexec helper applies Linux memory limits immediately before execution. Parent-death signals, explicit process-group termination, bounded output and reaping cover child lifecycle. Worker cancellation and recovery establish identity through pidfds and exact worker arguments. These controls manage trusted workloads and do not constitute an untrusted-code sandbox.
 
-Go verifies engine results and financial evidence without implementing order matching or portfolio construction. Cross-language fixtures check canonical request bytes and SHA-256 identity. Keep decimal monetary values exact. Existing request and result schemas remain the compatibility contract; fixture coverage alone does not prove every historical workload is supported.
+Go verifies engine results and financial evidence without implementing order matching or portfolio construction. Cross-language fixtures check canonical request bytes and SHA-256 identity. Keep decimal monetary values exact. Existing request and result schemas remain the compatibility contract. Fixture coverage alone does not prove every historical workload is supported.
 
 ## Deployment status and remaining evidence
 

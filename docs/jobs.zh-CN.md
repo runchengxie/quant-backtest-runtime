@@ -17,15 +17,15 @@ v2 同时要求 `execution.ledger=true` 和 `execution.ledger_config.enabled=tru
 
 各版本都可以提供 `quant_run_manifest_ref`，指向同一 artifact store 中的 typed `QuantRunManifest`。提交和 worker 会校验 manifest 及其 `component_refs` 的内容哈希。只有 v2 将已校验的根文件复制为结果中的 `quant_run_manifest.json`，并记录其哈希与研究运行 ID。v1、v3、v4 会校验该输入，但不会将它保留到发布结果中，须保留原请求和 artifact store。
 
-v3 接受 `positions_ref`、`pricing_ref` 和 `decision_clocks_ref`。前两者为 Parquet，时钟输入为不超过 1 MiB 的 JSON 对象，以调仓日期为键；三者均使用 `artifact://sha256/<digest>`。仓库中的 [v3 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v3.json)里的哈希仅为占位，提交前须写入真实输入文件并替换引用。每个日期须有独立且完整的 `research.clock.v1`，平台后端会核对目标、入场与估值日期。v3 保留诊断证据等级，不把缺少来源可见性证明的历史回放标记为正式执行证据。
+v3 接受 `positions_ref`、`pricing_ref` 和 `decision_clocks_ref`。前两者为 Parquet，时钟输入为不超过 1 MiB 的 JSON 对象，以调仓日期为键。三者均使用 `artifact://sha256/<digest>`。仓库中的 [v3 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v3.json)里的哈希仅为占位，提交前须写入真实输入文件并替换引用。每个日期须有独立且完整的 `research.clock.v1`，平台后端会核对目标、入场与估值日期。v3 保留诊断证据等级，不把缺少来源可见性证明的历史回放标记为正式执行证据。
 
-v4 的 `accounting_ref` 指向一张 Parquet 表，列为 `symbol`、`previous_weight`、`target_weight`、`previous_price`、`current_price` 和 `tradable`。`config` 仅含 `commission_rate`、`stamp_tax_rate` 和 `slippage_rate`，`execution` 为空对象。仓库中的 [v4 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v4.json)里的哈希为占位。平台后端按价格漂移后的权重计算成交与成本，runtime 保存单行 `accounting.parquet` 与哈希清单；`result` 验证后返回换手及分项成本。此诊断口径不代表真实成交。
+v4 的 `accounting_ref` 指向一张 Parquet 表，列为 `symbol`、`previous_weight`、`target_weight`、`previous_price`、`current_price` 和 `tradable`。`config` 仅含 `commission_rate`、`stamp_tax_rate` 和 `slippage_rate`，`execution` 为空对象。仓库中的 [v4 请求示例](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v4.json)里的哈希为占位。平台后端按价格漂移后的权重计算成交与成本，runtime 保存单行 `accounting.parquet` 与哈希清单。`result` 验证后返回换手及分项成本。此诊断口径不代表真实成交。
 
 仓库请求示例都使用占位内容哈希。可以校验请求结构，但执行前须提供匹配的实际输入文件。`scripts/create_example.py` 则生成匹配的 v2 合成输入与请求。
 
 请求文件必须是普通 JSON 文件，大小不超过 64 KiB。`idempotency_key` 匹配 `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`。同一键和同一请求重复提交返回已有任务，同一键绑定不同内容时会报冲突。修改参数后重跑应使用新键。
 
-输入采用 `artifact://sha256/<digest>`，对应文件位于 `<artifact-root>/sha256/<digest>`。v1 和 v2 要求 `positions_ref`、`pricing_ref` 和 `periods_ref`，`intraday_bars_ref` 可选；v3 和 v4 的输入见上文。worker 读取输入前会校验文件 SHA-256。调用方负责把输入写入该目录并保持不可变。
+输入采用 `artifact://sha256/<digest>`，对应文件位于 `<artifact-root>/sha256/<digest>`。v1 和 v2 要求 `positions_ref`、`pricing_ref` 和 `periods_ref`，`intraday_bars_ref` 可选。v3 和 v4 的输入见上文。worker 读取输入前会校验文件 SHA-256。调用方负责把输入写入该目录并保持不可变。
 
 `budgets.wall_seconds` 取值为 1 至 86400，`budgets.memory_mb` 取值为 256 至 65536。内存限制约束进程虚拟地址空间，导入依赖也会占用预算。无法设置资源限制时任务失败。
 
@@ -37,7 +37,7 @@ v2 由调用方提供完整的 `research.clock.v1`。一个 v2 Job 对应一次�
 
 ## CLI 操作
 
-每个 `backtest-job` 命令都须在子命令之前提供 `--database`、`--artifact-root` 和 `--result-root`。没有默认数据路径或 locale 选项。可在仓库根目录执行隔离合成示例：
+每个 `backtest-job` 命令都须在子命令之前提供 `--database`、`--artifact-root` 和 `--result-root`。没有默认数据路径或 locale 选项。可在仓库根目录执行隔离合成示例。
 
 ```bash
 runtime_data_root=$(mktemp -d)
@@ -49,17 +49,17 @@ uv run --locked --extra legacy backtest-job \
   submit "$runtime_data_root/request.json"
 ```
 
-`create_example.py --output` 接收目录，不覆盖其中已有的请求。后续命令继续使用这个临时目录；需要保留的任务应使用稳定的外部数据目录。
+`create_example.py --output` 接收目录，不覆盖其中已有的请求。后续命令继续使用这个临时目录。需要保留的任务应使用稳定的外部数据目录。
 
 | 子命令 | 成功时的 JSON 输出与行为 |
 | --- | --- |
-| `submit REQUEST` | `job_id`、`status`、`created`；回执仍为 `SUBMITTED` 时启动独立 worker |
+| `submit REQUEST` | `job_id`、`status`、`created`。回执仍为 `SUBMITTED` 时启动独立 worker |
 | `status JOB_ID` | 任务状态、时间、取消、结果、错误与 PID 字段，同时恢复过期任务 |
 | `cancel JOB_ID` | 记录取消并尝试向匹配 worker 发信号后的任务状态 |
-| `result JOB_ID` | 校验后的对应版本结果清单；要求 `SUCCEEDED`，不执行租约恢复 |
+| `result JOB_ID` | 校验后的对应版本结果清单。要求 `SUCCEEDED`，不执行租约恢复 |
 | `recover` | `recovered`，统计新增的过期状态转换，不统计清理尝试次数 |
 
-使用其他子命令时，只替换上述命令最后的 `submit REQUEST` 部分，保留三个路径。`status` 不是只读查询，恢复可能修改状态并删除未发布输出。CLI 参数解析错误返回 `2`；请求、状态或完整性错误返回非零退出码，stderr 可能输出 traceback，不保证提供 JSON 错误。`backtest-worker` 是 CLI 调用的执行入口，数据库参数名为 `--registry`。
+使用其他子命令时，只替换上述命令最后的 `submit REQUEST` 部分，保留三个路径。`status` 会执行恢复，可能修改状态并删除未发布输出。CLI 参数解析错误返回 `2`。请求、状态或完整性错误返回非零退出码，stderr 可能输出 traceback，不保证提供 JSON 错误。`backtest-worker` 是 CLI 调用的执行入口，数据库参数名为 `--registry`。
 
 状态对象包含 `job_id`、`status`、`created_at`、`updated_at`、`cancel_requested_at`、`result_ref`、`result_sha256`、`error_code`、`error_message` 和 `worker_pid`。尚无值的可选字段保留为 JSON `null`。服务 API 的 `get_result` 返回引用，CLI 的 `result` 会进一步校验已存结果文件。
 
@@ -84,9 +84,9 @@ worker 领取任务后，租约截止时间为领取时间加 `wall_seconds` 再
 
 ### 恢复与持久性边界
 
-恢复测试覆盖进程中断，以及结果目录重命名后状态提交失败的情况。结果目录已发布不等于任务成功；租约恢复会清理未完成成功状态提交的结果。
+恢复测试覆盖进程中断，以及结果目录重命名后状态提交失败的情况。结果目录已发布不等于任务成功。租约恢复会清理未完成成功状态提交的结果。
 
-发布流程在提交 `SUCCEEDED` 前，先关闭所有暂存结果文件并逐一调用 `fsync`，包括嵌套目录中的文件和清单；再从叶子目录向上同步暂存目录，重命名为最终结果目录，最后同步结果根目录。创建暂存目录前还会同步结果根目录及其祖先目录，包括本次新建的目录。任何同步或重命名失败都会阻止成功状态提交。重命名之后发生故障，可能留下尚未登记成功的目录，由租约恢复流程清理；原有租约约束与结果哈希校验继续生效。
+发布流程在提交 `SUCCEEDED` 前，先关闭所有暂存结果文件并逐一调用 `fsync`，包括嵌套目录中的文件和清单。随后，发布流程从叶子目录向上同步暂存目录，重命名为最终结果目录，最后同步结果根目录。创建暂存目录前还会同步结果根目录及其祖先目录，包括本次新建的目录。任何同步或重命名失败都会阻止成功状态提交。重命名之后发生故障，可能留下尚未登记成功的目录，由租约恢复流程清理。原有租约约束与结果哈希校验继续生效。
 
 此发布流程要求 POSIX 目录 `fsync`。Windows 或不支持目录同步的文件系统会报错，任务不会被当作成功完成。同步操作依赖文件系统和存储设备对持久化请求的实现，不能保证所有硬件在断电后都能保留数据。测试验证操作顺序及注入的 I/O 故障，没有模拟物理断电。`result` 命令读取成功任务的结果时会重新校验完整性。请保留原请求和按内容哈希寻址的不可变输入，便于结果丢失或校验失败后使用新的幂等键重跑。
 
@@ -104,7 +104,7 @@ flowchart LR
 
 v1 和 v3 结果包含五张诊断表。v2 结果包含平台的 `portfolio_backtester.backtest_result.v1` 标准结果包。v4 结果包含单行成本表。`result` 会校验任务身份、请求指纹、清单哈希和结果文件哈希，再返回元数据。发现文件被修改时会报错。
 
-回测任务成功表示结果已完成发布并校验。v2 提供 `quant_run_manifest_ref` 时，`result` 会校验复制文件的哈希、typed 结构及研究运行 ID，不会重新读取外部输入库中的组件文件；组件文件在提交和 worker 校验时检查。研究运行 ID 与运行时任务 UUID 是不同身份。研究晋升仍需要研究侧完成来源核对和人工审批；运行时不会自动晋升策略。
+回测任务成功表示结果已完成发布并校验。v2 提供 `quant_run_manifest_ref` 时，`result` 会校验复制文件的哈希、typed 结构及研究运行 ID，不会重新读取外部输入库中的组件文件。组件文件在提交和 worker 校验时检查。研究运行 ID 与运行时任务 UUID 是不同身份。研究晋升仍需要研究侧完成来源核对和人工审批。运行时不会自动晋升策略。
 
 新发布的 v1/v2 清单增加 `metric_basis` 对象，版本为
 `quant.result_metric_basis.v1`。v1 的 `summary` 和 `performance` 标为
@@ -118,20 +118,23 @@ v2 只发布正式执行账本包，不发布后端的区间收益摘要和绩�
 ## Agent 调用
 
 `backtest-job capabilities` 无需数据路径，返回带权限、副作用和重试说明的
-`quant.agent_capabilities.v1`，覆盖 v1–v6。能力发现本身不授予权限。
+`quant.agent_capabilities.v1`，覆盖 v1 至 v6。能力发现本身不授予权限。
 
 携带前文的存储参数调用 `plan REQUEST`，再用
-`submit REQUEST --expected-plan-sha256 DIGEST` 绑定计划。预检核验请求结构、输入哈希、
-根清单和组件以及 v5 可执行文件摘要；计划变化会在建库或恢复前失败。资源字段是上限，
-不是耗时估计。预检不会运行引擎，也不验证 Parquet 行、时钟与表内容、资源限制、历史 PIT、
-经济有效性或晋升。v5 请求语义只有引擎内的权威校验器能够验证，因此明确返回
-`engine_request_semantics=not_checked`。Worker 仍重新校验输入。
+`submit REQUEST --expected-plan-sha256 DIGEST` 绑定计划。
+预检核验请求结构、输入哈希、根清单和组件，以及选定的引擎可执行文件摘要。
+计划变化会在建库或恢复前失败，资源字段表示上限，实际耗时需要单独测量。
+v5 预检会调用固定引擎的静态校验器，不运行回测。通过后，计划记录
+`engine_request_semantics=passed`，并将校验回执纳入计划摘要。
+v6 仍记录 `engine_request_semantics=not_checked`，详见[静态校验说明](development.zh-CN.md)。
+预检不验证 Parquet 行、时钟与表内容、资源限制、历史 PIT、经济有效性或研究晋升。
+worker 在执行时仍会重新校验输入，计划通过也不保证执行成功。
 
 `inspect JOB_ID` 和 `lookup --idempotency-key KEY` 以 SQLite `mode=ro` 读取已有库，
 不建库、迁移、恢复租约、清理输出或发送进程信号。活动 WAL 可能使用 SQLite 协调文件，
-所以这里承诺应用只读，而非文件系统零写入。旧 `status` 仍会执行恢复；旧 `result` 保留
+这里保证应用层只读，文件系统仍可能产生协调写入。旧 `status` 仍会执行恢复。旧 `result` 保留
 存储初始化行为并验证发布文件哈希。提交响应丢失后先 lookup，再决定是否用相同请求和键重试。
 
 全局 `--error-format json` 在 stderr 输出单条 `quant.agent_error.v1`，失败时 stdout
-为空。参数错误退出 2，领域错误退出 1；错误带稳定代码、保守的重试标记、建议和已知任务身份。
+为空。参数错误退出 2，领域错误退出 1。错误带稳定代码、保守的重试标记、建议和已知任务身份。
 内部错误不泄露原始异常。默认文本模式保持原行为。计划通过、任务成功和完整性核验都不等于研究晋升。

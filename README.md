@@ -1,72 +1,69 @@
 # quant-backtest-runtime
 
-[中文 README](README.zh-CN.md)
+[中文说明](README.zh-CN.md) · [Documentation](https://runchengxie.github.io/quant-backtest-runtime/)
 
-The Go implementation owns job state, worker supervision and durable publication. Native v5/v6 Rust engine jobs run without Python. Legacy v1–v4 financial computation uses an explicitly configured, stateless Python adapter.
+Submit a backtest, follow its progress and retrieve checked results.
+This runtime keeps job state in SQLite, runs separate worker processes, supports
+queues and cancellation, and checks results before saving them for later use.
 
-Build on Linux with Go 1.27.3. Choose an external output directory.
+Use it to manage multiple backtest jobs and retain their results. The Go CLI manages jobs. The separately
+installed [quant-backtest-engine](https://github.com/runchengxie/quant-backtest-engine)
+simulates trades. Strategies and research decisions belong to callers.
+[quant-platform](https://github.com/runchengxie/quant-platform) supplies the optional
+Python backends for older jobs. See [repository ownership](docs/ownership.md).
 
-```sh
-go build -trimpath -o /absolute/external/runtime/bin/backtest-job ./cmd/backtest-job
-```
+## Run a synthetic job
 
-The [Go guide](docs/go-runtime.md) covers immediate submission, the bounded persistent queue and the optional legacy interpreter. Production cutover requires stopping the previous lifecycle owner and backing up its database. This migration does not switch production services or schedules.
+Use a source checkout on Linux, Go 1.27.3 and Python 3.12+ for the check script
+(standard library only). Native engine jobs do not need Python installed to run.
+First install a reviewed engine executable using its
+[release guide](https://runchengxie.github.io/quant-backtest-engine/releases/).
+The documented alpha.2 supports the validator needed by current v5 jobs.
 
-`quant-backtest-runtime` accepts submitted backtest jobs, validates requests, manages job state in SQLite, runs workers, and validates and publishes results. It does not run LLM agents.
-
-Within the Quant Research project family, [`quant-platform`](https://github.com/runchengxie/quant-platform) provides reusable backtest capabilities, the research layer owns strategies and promotion, and this repository owns generic job execution. See [Repository ownership](docs/ownership.md) for the boundaries.
-
-## Python compatibility example
-
-Linux and `uv` are required. Package metadata requires Python 3.12 or newer; CI validates 3.12 and 3.13. Other Python versions are not covered by these jobs:
-
-```bash
-uv sync --locked --extra legacy --group dev --python 3.13
-uv run --locked --extra legacy python scripts/smoke_backtest.py
-```
-
-The example uses synthetic data in a temporary directory. It submits a job and validates the result without requiring private research data.
-
-## Reading order
-
-1. [Backtest jobs and results](docs/jobs.md): request versions, input references, job state, and result validation.
-2. [Development and checks](docs/development.md): local setup, quality gates, and test scope.
-3. [Operations and troubleshooting](docs/operations.md): release directories, rollback, and common failures.
-4. [Repository ownership](docs/ownership.md): interfaces with the research and platform repositories.
-
-## Python compatibility installation
-
-The base package has no Python runtime dependencies. It supports v5/v6 Rust jobs,
-SQLite lifecycle management, engine result verification, and agent discovery and
-preflight. Install a reviewed engine executable separately and pass its absolute
-path with `--engine-executable`:
+From this repository's root, replace the three paths below. Keep builds and
+results outside the source tree. `check_root` must be a new directory each time.
 
 ```sh
-pip install quant-backtest-runtime
-# From this repository, with locked development tools but no legacy stack:
-uv sync --locked --group dev
+runtime_build=/absolute/external/runtime-build
+engine=/absolute/path/to/quant-backtest-engine
+check_root=/absolute/external/new-synthetic-check
+mkdir -p "$runtime_build"
+revision=$(git rev-parse HEAD)
+go build -trimpath \
+  -ldflags "-X github.com/runchengxie/quant-backtest-runtime/internal/app.SourceRevision=$revision" \
+  -o "$runtime_build/backtest-job" ./cmd/backtest-job
+python3 scripts/smoke_native.py \
+  --executable "$runtime_build/backtest-job" \
+  --expected-runtime-revision "$revision" \
+  --engine-executable "$engine" \
+  --engine-request examples/engine-request-v2.json \
+  --root "$check_root"
 ```
 
-For v1-v4 execution, legacy result reads, or `quant_run_manifest_ref` validation,
-install the explicit compatibility extra:
+The script creates synthetic inputs, queues a job, checks duplicate submission,
+cancels a second job, drains the queue and verifies the saved result.
+Success prints JSON with `status: "SUCCEEDED"`, `cancel_status: "CANCELLED"` and
+`summary.equity: "10099"`. It retains a database, artifacts, results and
+`receipt.json` under `check_root`. No private data or production database is needed.
 
-```sh
-pip install 'quant-backtest-runtime[legacy]'
-# Locked repository workflow:
-uv sync --locked --extra legacy --group dev
-```
+## Current scope
 
-The extra pins quant-platform to a reviewed Git revision and requires Git access.
-The `dev` group does not enable it automatically. Missing packages produce
-`LEGACY_DEPENDENCY_UNAVAILABLE` with installation guidance; CLI plan and submit
-reject the request before creating state. Dependency preflight checks package
-availability only, without importing pandas or portfolio code; it does not prove
-backend compatibility or request semantics. Existing v1-v6 request fingerprints,
-plan payloads and persisted state contracts remain unchanged. v6 plans still mark
-engine semantics `not_checked`; v5 uses the engine's static validator.
+Native v5 jobs return a final account snapshot. v6 jobs return a daily session
+ledger. Both use the external Rust engine and remain diagnostic evidence.
+Supported trading rules come from that engine. Successful publication does not
+mean every requested order filled or that a strategy is ready for production.
+Raw partition transport v7 is a design proposal, not an active job protocol.
 
-This is an installation boundary, not migration of Python algorithms to Rust.
-Keep the legacy extra until callers and unsupported scenarios have migrated.
-Runtime continues to own process supervision, SQLite state and result publication
-verification through its engine protocol; it does not use the provider SDK as a
-subprocess supervisor.
+Older v1-v4 jobs use an explicitly configured Python compatibility adapter.
+The [installation options](docs/development.md#installation-variants) and
+[Python example](docs/index.md#run-the-synthetic-example) cover that path.
+Go and Python job managers must never manage the same database concurrently.
+Production cutover requires stopping the previous owner and backing up its state.
+See the [Go guide](docs/go-runtime.md#cutover-and-rollback).
+
+## Next steps
+
+- [Go runtime guide](docs/go-runtime.md). Submit jobs, run a persistent queue and set limits
+- [Jobs and results](docs/jobs.md). Requests, status and result validation
+- [Development](docs/development.md). Dependencies and required checks
+- [Operations](docs/operations.md). Releases, rollback and troubleshooting

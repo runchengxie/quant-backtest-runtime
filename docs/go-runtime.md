@@ -22,7 +22,7 @@ BACKTEST_ENGINE_TEST_EXECUTABLE=/releases/engine/quant-backtest-engine \
 uv run --locked --extra legacy pytest -q tests/test_go_runtime.py
 ```
 
-CI also runs native protocol tests against its pinned engine source revision. These checks provide fixture-specific evidence; they do not establish compatibility with every historical job or deployment.
+CI also runs native protocol tests against its pinned engine source revision. These checks provide fixture-specific evidence. They do not establish compatibility with every historical job or deployment.
 
 For an immutable local release, use `scripts/release.py stage COMMIT --implementation go` with the documented `--repo` and `--production` paths. The commit must already belong to `origin/main`. The helper builds `bin/backtest-job`, records the source revision in `version`, and writes the readiness marker after a successful build. Staging does not switch the active release. The helper retains Python as its default implementation for existing deployments.
 
@@ -39,7 +39,7 @@ python3 /releases/runtime/COMMIT/scripts/smoke_native.py \
   --root /data/runtime-checks/unique-check
 ```
 
-Replace `COMMIT` with the full merged runtime revision. The check compares the build identity before creating state, then submits a plan-bound queued job. It verifies duplicate submission and receipt lookup, cancels a second queued job, drains the queue, and asks the runtime to verify the published result. It leaves `receipt.json`, the synthetic database and artifacts for inspection. The receipt records executable digests and the result hash. Existing output directories are rejected, including empty ones. A passing check covers the supplied fixture; review its financial expectations separately.
+Replace `COMMIT` with the full merged runtime revision. The check compares the build identity before creating state, then submits a plan-bound queued job. It verifies duplicate submission and receipt lookup, cancels a second queued job, drains the queue, and asks the runtime to verify the published result. It leaves `receipt.json`, the synthetic database and artifacts for inspection. The receipt records executable digests and the result hash. Existing output directories are rejected, including empty ones. A passing check covers the supplied fixture. Review its financial expectations separately.
 
 ## Limit a scheduler service
 
@@ -59,7 +59,7 @@ systemd-run --user --wait --pipe --collect \
 
 These values are an example for a synthetic check. Choose production limits from measured workload peaks and leave room for the scheduler. Verify the effective `memory.max`, `memory.swap.max` and `cpu.max` in the service's cgroup. A separate controlled allocation probe should verify that a child exceeding the memory boundary is killed. Keep its inputs and outputs isolated from real tasks.
 
-For a persistent queue, launch `backtest-job ... serve --concurrency N` as the service command. Submit only queued jobs from outside that service. Workers launched by the scheduler inherit its cgroup; immediate submissions from elsewhere do not. The service memory ceiling covers the whole queue process tree. Individual jobs retain their separate child address-space budgets. An out-of-memory event can interrupt several jobs, so inspect their processes and use `recover` after restarting. For per-job aggregate limits, enable the delegated mode below.
+For a persistent queue, launch `backtest-job ... serve --concurrency N` as the service command. Submit only queued jobs from outside that service. Workers launched by the scheduler inherit its cgroup. Immediate submissions from elsewhere do not. The service memory ceiling covers the whole queue process tree. Individual jobs retain their separate child address-space budgets. An out-of-memory event can interrupt several jobs, so inspect their processes and use `recover` after restarting. For per-job aggregate limits, enable the delegated mode below.
 
 ## Submit a native job
 
@@ -100,13 +100,13 @@ The scheduler discovers persisted queued jobs after restart. A slot remains occu
 
 ## Limit each queued job
 
-Run `serve --cgroup-root auto` under a systemd service with `Delegate=memory` and `DelegateSubgroup=supervisor`. The scheduler must start in the delegated `supervisor` subgroup. Alternatively pass an absolute, empty, delegated cgroup v2 parent through `--cgroup-root`. Ordinary directories and missing delegation fail with `RESOURCE_LIMIT_UNAVAILABLE`; no weaker fallback is used. This option is available only to `serve`.
+Run `serve --cgroup-root auto` under a systemd service with `Delegate=memory` and `DelegateSubgroup=supervisor`. The scheduler must start in the delegated `supervisor` subgroup. Alternatively pass an absolute, empty, delegated cgroup v2 parent through `--cgroup-root`. Ordinary directories and missing delegation fail with `RESOURCE_LIMIT_UNAVAILABLE`. No weaker fallback is used. This option is available only to `serve`.
 
 The scheduler creates a database-specific namespace and a fresh group for each job. Linux clones the worker directly into that group before Go initialization. `budgets.memory_mb` sets its `memory.max` in MiB, with swap disabled and group OOM termination enabled. The group includes the worker, engine and optional Python descendants. The scheduler remains outside. The existing child address-space limit also applies. Physical memory accounting differs from virtual address-space accounting, so this adds an aggregate boundary without claiming equivalence to the old Python limit.
 
 An OOM-killed active worker becomes `FAILED` with `JOB_MEMORY_EXCEEDED`. Cancellation takes precedence when already requested. The scheduler continues with later queued jobs. It records memory peak and OOM counters in `.logs/<job-id>.resources.json`, synchronizes a snapshot before removing the group, and marks final cleanup in the receipt. Receipt storage failure stops scheduling and retains the group/counters when removal has not happened. Published financial result manifests keep their existing contract.
 
-Restart reconciliation retains live claimed workers and counts their slots. A worker interrupted between spawn and claim is conservatively failed and its group cleared. Completed or abandoned groups are killed and removed before reuse. Existing successful state is preserved. These controls supervise trusted code; a process with permission to edit the delegated hierarchy can alter its own controls.
+Restart reconciliation retains live claimed workers and counts their slots. A worker interrupted between spawn and claim is conservatively failed and its group cleared. Completed or abandoned groups are killed and removed before reuse. Existing successful state is preserved. These controls supervise trusted code. A process with permission to edit the delegated hierarchy can alter its own controls.
 
 Use [the TOML example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/configs/runtime.example.toml) and [the user service template](https://github.com/runchengxie/quant-backtest-runtime/blob/main/configs/quant-backtest-runtime.service). Keep actual paths in private deployment configuration. `scripts/serve_config.py --config /configured/runtime.toml --dry-run` prints the command without opening the task database. Without `--dry-run`, the standard-library launcher replaces itself with Go. The same `[runtime]` table can configure research clients. Set `queue=true`, pin the engine and optional adapter interpreter, and tune `[scheduler].concurrency` to measured capacity. Install the unit in the user's systemd directory, reload it, and validate with a separate synthetic task database before assigning real work.
 
@@ -114,7 +114,7 @@ Kernel memory controller behavior is documented in [cgroup v2](https://docs.kern
 
 ## Optional Python compatibility adapter
 
-For legacy v1–v4 requests and operations that need legacy contract validation, install `quant-backtest-runtime[legacy]` into a Python environment and pass that interpreter's absolute path with `--python-executable`. From the repository, `uv sync --locked --extra legacy --group dev` provides the locked development environment.
+For legacy v1-v4 requests and operations that need legacy contract validation, install `quant-backtest-runtime[legacy]` into a Python environment and pass that interpreter's absolute path with `--python-executable`. From the repository, `uv sync --locked --extra legacy --group dev` provides the locked development environment.
 
 Go invokes the stateless adapter through that interpreter. Python normalizes the existing financial contract and writes staged computation artifacts. Go owns SQLite transitions, result verification and final publication. The adapter does not open the job database or publish the final result directory. The existing Python CLI remains available for compatibility and rollback.
 

@@ -13,19 +13,19 @@ The runtime accepts six request versions. v1 and v2 use `native.position_replay`
 | v3 | Multi-decision execution diagnostics | `evidence_tier=diagnostic`, one research clock per rebalance, and an enabled ledger | `ticknet.backtest_job_result.v1` |
 | v4 | Trade-cost accounting for one weight adjustment | `evidence_tier=diagnostic`, content-hashed input, and non-negative finite rates | `quant.trade_accounting_result.v1` |
 
-v2 requires both `execution.ledger=true` and `execution.ledger_config.enabled=true`. See the [v2 request example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v2.json) and [`contracts.py`](https://github.com/runchengxie/quant-backtest-runtime/blob/main/src/backtest_runtime/contracts.py). Requests must supply the complete version-specific `config`, `execution` and `budgets` objects. The runtime does not fill omitted fields from backend defaults; unknown fields are rejected. Nullable fields still require their keys.
+v2 requires both `execution.ledger=true` and `execution.ledger_config.enabled=true`. See the [v2 request example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v2.json) and [`contracts.py`](https://github.com/runchengxie/quant-backtest-runtime/blob/main/src/backtest_runtime/contracts.py). Requests must supply the complete version-specific `config`, `execution` and `budgets` objects. The runtime does not fill omitted fields from backend defaults. Unknown fields are rejected. Nullable fields still require their keys.
 
 All request versions may include `quant_run_manifest_ref`, pointing to a typed `QuantRunManifest` in the same artifact store. Submission and worker validation check the manifest and the content hashes of its `component_refs`. Only v2 copies the validated root to `quant_run_manifest.json` in the result and records its hash and research run ID. v1, v3 and v4 validate this input but do not retain it in their published result. Keep the original request and artifact store for those versions.
 
-v3 accepts `positions_ref`, `pricing_ref`, and `decision_clocks_ref`. The first two are Parquet files; the clock input is a JSON object no larger than 1 MiB keyed by rebalance date. All three use `artifact://sha256/<digest>`. The hashes in the [v3 request example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v3.json) are placeholders and must be replaced with real input hashes before submission. Each date requires a complete `research.clock.v1`; the backend checks target, entry, and valuation dates.
+v3 accepts `positions_ref`, `pricing_ref`, and `decision_clocks_ref`. The first two are Parquet files. The clock input is a JSON object no larger than 1 MiB keyed by rebalance date. All three use `artifact://sha256/<digest>`. The hashes in the [v3 request example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v3.json) are placeholders and must be replaced with real input hashes before submission. Each date requires a complete `research.clock.v1`. The backend checks target, entry, and valuation dates.
 
-v4 `accounting_ref` points to a Parquet table with `symbol`, `previous_weight`, `target_weight`, `previous_price`, `current_price`, and `tradable`. `config` contains only `commission_rate`, `stamp_tax_rate`, and `slippage_rate`; `execution` is an empty object. The hashes in the [v4 request example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v4.json) are placeholders. This diagnostic convention does not represent actual execution.
+v4 `accounting_ref` points to a Parquet table with `symbol`, `previous_weight`, `target_weight`, `previous_price`, `current_price`, and `tradable`. `config` contains only `commission_rate`, `stamp_tax_rate`, and `slippage_rate`. `execution` is an empty object. The hashes in the [v4 request example](https://github.com/runchengxie/quant-backtest-runtime/blob/main/examples/request-v4.json) are placeholders. This diagnostic convention does not represent actual execution.
 
 All committed request examples use placeholder content hashes. Their request shapes can be validated, but they require matching real input files before execution. `scripts/create_example.py` instead creates matching synthetic v2 inputs and a request.
 
-Request files must be ordinary JSON files no larger than 64 KiB. `idempotency_key` matches `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`. Reusing a key with the same request returns the existing job; binding the key to different content is an error. Use a new key when changing parameters.
+Request files must be ordinary JSON files no larger than 64 KiB. `idempotency_key` matches `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`. Reusing a key with the same request returns the existing job. Binding the key to different content is an error. Use a new key when changing parameters.
 
-Inputs use `artifact://sha256/<digest>` and are stored below `<artifact-root>/sha256/<digest>`. v1 and v2 require `positions_ref`, `pricing_ref`, and `periods_ref`; `intraday_bars_ref` is optional. The worker verifies each input SHA-256 before reading it. Callers own input creation and immutability.
+Inputs use `artifact://sha256/<digest>` and are stored below `<artifact-root>/sha256/<digest>`. v1 and v2 require `positions_ref`, `pricing_ref`, and `periods_ref`. `intraday_bars_ref` is optional. The worker verifies each input SHA-256 before reading it. Callers own input creation and immutability.
 
 `budgets.wall_seconds` ranges from 1 to 86400 and `budgets.memory_mb` from 256 to 65536. The memory limit covers the process virtual address space, including imported dependencies. A job fails when resource limits cannot be applied.
 
@@ -37,7 +37,7 @@ Research clocks do not prove an intraday fill time. Callers must provide a windo
 
 ## CLI lifecycle
 
-Every `backtest-job` command requires `--database`, `--artifact-root` and `--result-root` before the subcommand. There are no default data paths or locale option. For an isolated synthetic example, run from the repository root:
+Every `backtest-job` command requires `--database`, `--artifact-root` and `--result-root` before the subcommand. There are no default data paths or locale option. For an isolated synthetic example, run from the repository root.
 
 ```bash
 runtime_data_root=$(mktemp -d)
@@ -49,19 +49,19 @@ uv run --locked --extra legacy backtest-job \
   submit "$runtime_data_root/request.json"
 ```
 
-`create_example.py --output` takes a directory and refuses to overwrite its existing request. Keep that temporary directory for the following commands; use a stable external data directory for retained jobs.
+`create_example.py --output` takes a directory and refuses to overwrite its existing request. Keep that temporary directory for the following commands. Use a stable external data directory for retained jobs.
 
 | Subcommand | Successful JSON output and behavior |
 | --- | --- |
-| `submit REQUEST` | `job_id`, `status`, `created`; starts a separate worker while the receipt is `SUBMITTED` |
-| `status JOB_ID` | Job status, timestamps, cancellation, result, error and PID fields; also recovers expired jobs |
+| `submit REQUEST` | `job_id`, `status`, `created`. Starts a separate worker while the receipt is `SUBMITTED` |
+| `status JOB_ID` | Job status, timestamps, cancellation, result, error and PID fields. Also recovers expired jobs |
 | `cancel JOB_ID` | Job status after recording cancellation and attempting to signal a matching worker |
-| `result JOB_ID` | The verified version-specific result manifest; requires `SUCCEEDED` and does not run lease recovery |
+| `result JOB_ID` | The verified version-specific result manifest. Requires `SUCCEEDED` and does not run lease recovery |
 | `recover` | `recovered`, counting newly expired state transitions rather than cleanup attempts |
 
-Replace only the last `submit REQUEST` portion of the command above to use another subcommand, retaining all three paths. `status` is not a read-only query because recovery can change state and remove unpublished output. CLI parse errors exit with code `2`; request, state and integrity errors exit nonzero and may emit a traceback on stderr rather than a JSON error. The `backtest-worker` entry point is the runner used by the CLI; its database argument is named `--registry`.
+Replace only the last `submit REQUEST` portion of the command above to use another subcommand, retaining all three paths. `status` is not a read-only query because recovery can change state and remove unpublished output. CLI parse errors exit with code `2`. Request, state and integrity errors exit nonzero and may emit a traceback on stderr rather than a JSON error. The `backtest-worker` entry point is the runner used by the CLI. Its database argument is named `--registry`.
 
-Status objects contain `job_id`, `status`, `created_at`, `updated_at`, `cancel_requested_at`, `result_ref`, `result_sha256`, `error_code`, `error_message` and `worker_pid`. Unavailable optional values remain JSON `null`. The service API's `get_result` returns a reference; the CLI's `result` additionally validates the stored result files.
+Status objects contain `job_id`, `status`, `created_at`, `updated_at`, `cancel_requested_at`, `result_ref`, `result_sha256`, `error_code`, `error_message` and `worker_pid`. Unavailable optional values remain JSON `null`. The service API's `get_result` returns a reference. The CLI's `result` additionally validates the stored result files.
 
 ## State and recovery
 
@@ -76,28 +76,28 @@ stateDiagram-v2
     RUNNING --> FAILED: timeout, exception, or lease expiry
 ```
 
-Cancellation first records a request and then signals the worker confirmed to belong to the job. A completed job does not change state because of a repeated cancellation. `recover` handles expired leases; `submit` and `status` also trigger recovery. There is no resident scheduler, so unattended environments should run `recover` periodically.
+Cancellation first records a request and then signals the worker confirmed to belong to the job. A completed job does not change state because of a repeated cancellation. `recover` handles expired leases. `submit` and `status` also trigger recovery. There is no resident scheduler, so unattended environments should run `recover` periodically.
 
-A worker claim sets its lease to `wall_seconds + 30` seconds; CLI startup has a separate 60-second lease. A recorded cancellation prevents a later success transition. Recovery checks the command and job ID in `/proc`, then uses pidfd controls to terminate a matching expired worker and confirm its exit. If process inspection or termination cannot be completed, the job stays pending recovery. An absent or unrelated PID permits expiry without signaling an unrelated process. Expired running jobs become `CANCELLED` when cancellation was requested, otherwise `FAILED`.
+A worker claim sets its lease to `wall_seconds + 30` seconds. CLI startup has a separate 60-second lease. A recorded cancellation prevents a later success transition. Recovery checks the command and job ID in `/proc`, then uses pidfd controls to terminate a matching expired worker and confirm its exit. If process inspection or termination cannot be completed, the job stays pending recovery. An absent or unrelated PID permits expiry without signaling an unrelated process. Expired running jobs become `CANCELLED` when cancellation was requested, otherwise `FAILED`.
 
 ### Recovery and durability boundary
 
-Recovery tests cover process interruption and a result-directory rename followed by a failed state commit. A published directory alone does not make a job successful; lease recovery removes unpublished output.
+Recovery tests cover process interruption and a result-directory rename followed by a failed state commit. A published directory alone does not make a job successful. Lease recovery removes unpublished output.
 
-Before committing `SUCCEEDED`, publication closes and `fsync`s every staged result file (including nested payloads and the manifest), syncs staging directories from leaves upward, renames the staged directory, and syncs the result parent directory. The result-root ancestry is also synced before staging, including directories created for this publication. A failed sync or rename prevents the success transition. A failure after rename can leave an unpublished directory for lease recovery to remove; existing lease fencing and result hash checks still apply.
+Before committing `SUCCEEDED`, publication closes and `fsync`s every staged result file (including nested payloads and the manifest), syncs staging directories from leaves upward, renames the staged directory, and syncs the result parent directory. The result-root ancestry is also synced before staging, including directories created for this publication. A failed sync or rename prevents the success transition. A failure after rename can leave an unpublished directory for lease recovery to remove. Existing lease fencing and result hash checks still apply.
 
-This publication path requires POSIX directory `fsync`; Windows and filesystems that reject directory syncing fail closed rather than silently weakening the guarantee. Successful barriers request persistence according to the filesystem and storage stack; they do not establish a universal hardware or power-loss guarantee. Tests inject I/O faults and check ordering, not physical power loss. The `result` command checks integrity again when retrieving a successful result. Retain the request and its immutable, hash-addressed inputs so missing or rejected results can be rerun with a new idempotency key.
+This publication path requires POSIX directory `fsync`. Windows and filesystems that reject directory syncing fail closed rather than silently weakening the guarantee. Successful barriers request persistence according to the filesystem and storage stack. They do not establish a universal hardware or power-loss guarantee. Tests inject I/O faults and check ordering, not physical power loss. The `result` command checks integrity again when retrieving a successful result. Retain the request and its immutable, hash-addressed inputs so missing or rejected results can be rerun with a new idempotency key.
 
 ## Results and provenance
 
 The worker publishes results to a task-specific directory and stores a manifest hash in SQLite. `result` validates job identity, request fingerprint, manifest hash, and every result-file hash before returning metadata. Modified files are rejected.
 
-v1 and v3 results contain five diagnostic tables. v2 contains the platform `portfolio_backtester.backtest_result.v1` result package. v4 contains a one-row cost table. A successful job means that its result has been published and validated; it does not promote a strategy. Research promotion still requires source review and human approval in the research layer.
+v1 and v3 results contain five diagnostic tables. v2 contains the platform `portfolio_backtester.backtest_result.v1` result package. v4 contains a one-row cost table. A successful job means that its result has been published and validated. It does not promote a strategy. Research promotion still requires source review and human approval in the research layer.
 
 New v1/v2 manifests include an additive `metric_basis` object with
 `schema_version=quant.result_metric_basis.v1`. In v1, `summary` and `performance`
 are `period_return_replay`, including when an execution ledger is enabled. They
-retain historical period-return values; they do not measure the simulated fills.
+retain historical period-return values. They do not measure the simulated fills.
 `daily_ledger` is `execution_sim` when the backend produced that ledger and
 `not_available` otherwise. v2 publishes only the official execution ledger bundle,
 so its `summary` and `performance` labels are `not_published` and its
@@ -105,12 +105,12 @@ so its `summary` and `performance` labels are `not_published` and its
 Older manifests without this object remain readable. Consumers must distinguish
 these bases before comparing returns or using them as execution evidence.
 
-For v2's copied `QuantRunManifest`, `result` verifies the file hash, typed structure and research run ID. It does not reread component files from the external input store; those were checked at submission and worker validation. The research run ID and runtime job UUID are separate identities.
+For v2's copied `QuantRunManifest`, `result` verifies the file hash, typed structure and research run ID. It does not reread component files from the external input store. Those were checked at submission and worker validation. The research run ID and runtime job UUID are separate identities.
 
 ## Agent access
 
 `backtest-job capabilities` requires no storage paths and returns
-`quant.agent_capabilities.v1`. The catalogue covers request v1–v6 and describes
+`quant.agent_capabilities.v1`. The catalogue covers request v1-v6 and describes
 permissions, effects and retries. Discovery grants no authority.
 
 With the explicit storage options above, use `plan REQUEST` before execution.
@@ -120,26 +120,29 @@ resource ceilings and a deterministic `plan_sha256`. Submit using
 creation or recovery. Plans exclude display paths and do not alter request
 fingerprints. Inputs are checked again during execution.
 
-Plans check request shape, all input hashes, root/component manifests and v5
-executable bytes. They do not check Parquet rows, clock/table consistency,
-resource enforcement, historical PIT, economic validity or promotion. The v5
-engine request's semantic validator is only available inside the engine; the
-plan explicitly reports `engine_request_semantics=not_checked` instead of
-executing it or duplicating its validator. A passed plan is not execution success.
+Plans check request shape, all input hashes, root/component manifests and selected
+engine executable bytes. For v5, preflight invokes the pinned engine's static
+validator without running a simulation. A successful check records
+`engine_request_semantics=passed` and binds the validation receipt into the plan.
+v6 still reports `engine_request_semantics=not_checked`. See the
+[validator boundary](development.md#independent-rust-engine-jobs-v5).
+Plans do not check Parquet rows, clock/table consistency, resource enforcement,
+historical PIT, economic validity or promotion. Execution checks inputs again.
+A passed plan does not establish execution success.
 
 Use `inspect JOB_ID` for current state and `lookup --idempotency-key KEY` after
 losing a submission response. These open an existing database with SQLite
-`mode=ro`; they do not create a database, migrate, recover leases, signal processes
-or clean output. SQLite may use coordination sidecars for live WAL databases;
-this is an application read-only guarantee, not a filesystem-zero-write promise.
+`mode=ro`. They do not create a database, migrate, recover leases, signal processes
+or clean output. SQLite may use coordination sidecars for live WAL databases.
+This is an application read-only guarantee, not a filesystem-zero-write promise.
 Existing `status` still runs recovery. Existing `result` still verifies every
 published hash and retains its historical storage initialization behavior.
 
 Global `--error-format json` emits one `quant.agent_error.v1` object to stderr,
-with no success output on failure. Parse failures exit 2; domain failures exit 1.
+with no success output on failure. Parse failures exit 2. Domain failures exit 1.
 The error includes a stable code, conservative retry flag, suggested action and
 known job/key identities. Unknown internal failures omit raw diagnostics. Text
 mode retains legacy exceptions. Research approval is never implied by a job,
 plan, error suggestion or integrity check. Lost responses require lookup before
-retrying the identical request and key; use a new key only for a deliberate new
+retrying the identical request and key. Use a new key only for a deliberate new
 execution.
