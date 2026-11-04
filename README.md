@@ -65,5 +65,6 @@ See the [Go guide](docs/go-runtime.md#cutover-and-rollback).
 
 - [Go runtime guide](docs/go-runtime.md). Submit jobs, run a persistent queue and set limits
 - [Jobs and results](docs/jobs.md). Requests, status and result validation
+- [Session process channel](docs/session-stream.md). Opt-in Python streaming and replay recovery
 - [Development](docs/development.md). Dependencies and required checks
 - [Operations](docs/operations.md). Releases, rollback and troubleshooting

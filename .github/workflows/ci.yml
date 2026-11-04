@@ -114,6 +114,33 @@ jobs:
           BACKTEST_ENGINE_TEST_EXECUTABLE: ${{ github.workspace }}/.engine-source/target/debug/quant-backtest-engine
         run: uv run --locked --extra legacy pytest -q tests/test_engine_validation.py tests/test_rust_engine_jobs.py tests/test_engine_sessions.py
 
+  session-stream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: runchengxie/quant-backtest-engine
+          ref: 18a38978e31ac757b884f1696d0691d7a0c78f3f
+          path: .stream-engine-source
+      - uses: dtolnay/rust-toolchain@1.99.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: .stream-engine-source -> ${{ runner.temp }}/session-engine-target
+      - uses: astral-sh/setup-uv@v6
+      - name: Build the separately pinned session-stream provider
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/session-engine-target
+        run: cargo build --locked --manifest-path .stream-engine-source/Cargo.toml
+      - run: uv sync --locked --extra legacy --group dev --python 3.13
+      - name: Real session channel, strict framing and journal replay checks
+        env:
+          BACKTEST_ENGINE_STREAM_TEST_EXECUTABLE: ${{ runner.temp }}/session-engine-target/debug/quant-backtest-engine
+        run: |
+          test -x "$BACKTEST_ENGINE_STREAM_TEST_EXECUTABLE"
+          uv run --locked --extra legacy pytest -q tests/test_session_stream.py tests/test_session_stream_process.py
+
   minimal-install:
     runs-on: ubuntu-latest
     timeout-minutes: 20
