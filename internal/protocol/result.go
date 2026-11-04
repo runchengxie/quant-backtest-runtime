@@ -208,16 +208,7 @@ func validateEngine(in, r map[string]any) {
 	intents := intentMap(rows(in["orders"]))
 	bindOrders(orders, intents)
 	quotes := rows(in["quotes"])
-	last := map[string]map[string]any{}
-	for _, q := range quotes {
-		s := ident(q["symbol"])
-		timestamp(q["ts_ns"])
-		positive(q["bid"])
-		positive(q["ask"])
-		if old := last[s]; old == nil || integer(q["ts_ns"]) >= integer(old["ts_ns"]) {
-			last[s] = q
-		}
-	}
+	clocks, last := indexQuoteClocks(quotes)
 	quantities := map[string]*big.Rat{}
 	expectedCash := positive(in["initial_cash"])
 	for _, f := range fills {
@@ -225,13 +216,7 @@ func validateEngine(in, r map[string]any) {
 		bindFillIdentity(f, o)
 		ts := timestamp(f["ts_ns"])
 		require(ts > integer(o["information_ts_ns"]), "fill/request clock mismatch")
-		found := false
-		for _, q := range quotes {
-			if q["symbol"] == f["symbol"] && integer(q["ts_ns"]) == ts {
-				found = true
-			}
-		}
-		require(found, "fill has no input quote clock")
+		require(clocks[quoteClock{str(f["symbol"]), ts}], "fill has no input quote clock")
 		s := str(f["symbol"])
 		q := qty(f["quantity"], true)
 		notional := roundCent(mul(q, positive(f["price"])))
@@ -253,6 +238,31 @@ func validateEngine(in, r map[string]any) {
 		require(equal(mark, dec(p["mark_price"])), "engine input mark mismatch")
 	}
 }
+
+// quoteClock uses the complete identity: a clock for another instrument is not evidence.
+type quoteClock struct {
+	symbol    string
+	timestamp int64
+}
+
+// indexQuoteClocks validates every row, including duplicates. Equal-clock marks
+// retain the last input quote, matching the original ordered scan.
+func indexQuoteClocks(quotes []map[string]any) (map[quoteClock]bool, map[string]map[string]any) {
+	clocks := make(map[quoteClock]bool, len(quotes))
+	last := map[string]map[string]any{}
+	for _, q := range quotes {
+		s := ident(q["symbol"])
+		ts := timestamp(q["ts_ns"])
+		positive(q["bid"])
+		positive(q["ask"])
+		clocks[quoteClock{s, ts}] = true
+		if old := last[s]; old == nil || ts >= integer(old["ts_ns"]) {
+			last[s] = q
+		}
+	}
+	return clocks, last
+}
+
 func intentMap(rs []map[string]any) map[string]map[string]any {
 	out := map[string]map[string]any{}
 	for _, r := range rs {

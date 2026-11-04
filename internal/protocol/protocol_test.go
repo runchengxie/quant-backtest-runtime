@@ -144,9 +144,13 @@ func TestRoundCentHalfEven(t *testing.T) {
 		}
 	}
 }
-func TestV5FlowAndInputBinding(t *testing.T) {
+func v5Fixture() ([]byte, []byte) {
 	i := []byte(`{"schema_version":"engine_request.v1","initial_cash":"10","quotes":[{"symbol":"AAA","ts_ns":1735689600000000000,"bid":"2","ask":"2"}],"orders":[{"id":"b","symbol":"AAA","information_ts_ns":1735689599999999999,"side":"buy","quantity":"1"}]}`)
 	b := []byte(`{"schema_version":"engine_result.v1","backend":"nautilus","backend_version":"0.66.0","currency":"USD","capabilities":["quote_market_orders","multi_asset","final_balances","proportional_fees"],"cash":"7.99","positions_value":"2","equity":"9.99","commission":"0.01","orders":[{"id":"b","symbol":"AAA","status":"FILLED","filled_quantity":"1"}],"fills":[{"order_id":"b","symbol":"AAA","side":"buy","ts_ns":1735689600000000000,"quantity":"1","price":"2","commission":"0.01"}],"positions":[{"symbol":"AAA","quantity":"1","mark_price":"2","market_value":"2"}]}`)
+	return i, b
+}
+func TestV5FlowAndInputBinding(t *testing.T) {
+	i, b := v5Fixture()
 	r := nativeRequest(t, 5, i)
 	v, e := ValidateResult(r, i, b)
 	if e != nil {
