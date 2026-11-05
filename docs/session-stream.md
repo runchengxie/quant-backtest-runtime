@@ -4,7 +4,8 @@
 
 Use `backtest_runtime.session_stream.run_partition_sessions` to replay verified
 partition rows through one persistent Rust engine process. This opt-in Python API
-requires Linux and an engine release that provides `session-stream`. Existing
+requires Linux and an engine release that provides `session-stream`. For Go queue
+integration, use the separately defined [v7 mode](queued-sessions.md). Existing
 queued v1-v6 jobs, fingerprints, budgets, Go controls and gateways retain their
 current behavior. The provider pinned for their CI remains unchanged.
 

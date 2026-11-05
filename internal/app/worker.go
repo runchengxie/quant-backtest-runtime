@@ -23,6 +23,9 @@ var jobIDPattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f
 
 func workerArgs(o Options, id string) []string {
 	args := []string{"__worker", id, "--database", o.Database, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
+	if o.PartitionRoot != "" {
+		args = append(args, "--partition-root", o.PartitionRoot)
+	}
 	if o.EngineExecutable != "" {
 		args = append(args, "--engine-executable", o.EngineExecutable)
 	}
@@ -318,6 +321,9 @@ func execute(ctx context.Context, o Options, id string, r *protocol.Request) (st
 	if e := os.MkdirAll(o.ResultRoot, 0700); e != nil {
 		return "", "", e
 	}
+	if r.SchemaVersion == 7 {
+		return executeQueuedSessions(ctx, o, id, r)
+	}
 	if r.SchemaVersion < 5 {
 		receipt, e := legacyCall(ctx, o, "stage", []byte(r.CanonicalJSON), "--job-id", id)
 		if e != nil {
@@ -442,6 +448,9 @@ func readResult(ctx context.Context, o Options, j store.Job) (map[string]any, er
 	r, e := requestForJob(ctx, o, j)
 	if e != nil {
 		return nil, e
+	}
+	if r.SchemaVersion == 7 {
+		return readQueuedSessions(ctx, o, j, r)
 	}
 	if r.SchemaVersion < 5 {
 		return legacyCall(ctx, o, "verify", []byte(r.CanonicalJSON), "--job-id", j.JobID, "--manifest-sha256", *j.ResultSHA256)

@@ -2,10 +2,13 @@
 
 [中文页面](partition-transport-v7.zh-CN.md)
 
-This is a design proposal, not an accepted job/engine request schema. The active
+This original broad proposal remains a design record. A separately bounded
+[queued v7 contract](../queued-sessions.md) now activates verified partition
+sessions through the existing engine session channel. The open shapes below are
+not additional accepted input formats. The active
 v6 session request still embeds its existing inputs and retains its existing size
 limit. A `partition_manifest.v1` reference is not a valid v6 input extension.
-No gateway, worker, CLI or capability currently advertises this proposal.
+Go advertises only the explicit queued-session contract.
 
 A future versioned engine consumer could accept a manifest digest plus explicitly
 operator-approved input and task roots, validate financial payload schemas, and

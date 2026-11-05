@@ -2,8 +2,9 @@
 
 [English](partition-transport-v7.md)
 
-本文记录尚未启用的设计提案。现行 v6 会话请求仍采用既有的内嵌输入及大小
-限制，`partition_manifest.v1` 引用不能作为 v6 扩展提交。网关、worker、CLI 和能力发现均未启用本提案。
+本文保留原有的广泛设计提案。单独定义的[分区会话队列 v7](../queued-sessions.zh-CN.md)
+已通过现有引擎会话通道提供有界执行。下文开放的格式仍需分别审阅。
+现行 v6 会话请求保持既有内嵌输入与大小限制，`partition_manifest.v1` 引用只能按显式 v7 约定使用。
 
 未来采用新版本协议的引擎消费者可以接收清单摘要及操作者显式批准的输入、任务目录，验证金融负载后，
 消费[已验证的分区输入 v1](../partition-inputs-v1.zh-CN.md)。runtime 负责引用校验和有界读取，

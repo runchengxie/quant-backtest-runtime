@@ -3,6 +3,8 @@
 [中文页面](go-runtime.zh-CN.md)
 
 The Go `backtest-job` CLI owns SQLite state, worker supervision, scheduling and final result publication. Native v5/v6 jobs call the independently installed Rust engine without Python. Deployment configuration selects the active implementation.
+The explicit [v7 partition session mode](queued-sessions.md) uses a stateless
+Python adapter under the same Go lifecycle controls.
 
 ## Build and validate
 
