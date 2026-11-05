@@ -134,12 +134,18 @@ jobs:
           CARGO_TARGET_DIR: ${{ runner.temp }}/session-engine-target
         run: cargo build --locked --manifest-path .stream-engine-source/Cargo.toml
       - run: uv sync --locked --extra legacy --group dev --python 3.13
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.27.3"
+      - name: Build queued session CLI
+        run: go build -race -o "$RUNNER_TEMP/queued-backtest-job" ./cmd/backtest-job
       - name: Real session channel, strict framing and journal replay checks
         env:
+          BACKTEST_GO_EXECUTABLE: ${{ runner.temp }}/queued-backtest-job
           BACKTEST_ENGINE_STREAM_TEST_EXECUTABLE: ${{ runner.temp }}/session-engine-target/debug/quant-backtest-engine
         run: |
           test -x "$BACKTEST_ENGINE_STREAM_TEST_EXECUTABLE"
-          uv run --locked --extra legacy pytest -q tests/test_session_stream.py tests/test_session_stream_process.py
+          uv run --locked --extra legacy pytest -q tests/test_session_stream.py tests/test_session_stream_process.py tests/test_queued_sessions.py tests/test_go_queued_sessions.py
 
   minimal-install:
     runs-on: ubuntu-latest

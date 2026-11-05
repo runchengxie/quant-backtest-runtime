@@ -2,6 +2,8 @@
 
 [English](session-stream.md)
 
+需要接入 Go 任务队列时，请使用单独定义的 [v7 模式](queued-sessions.zh-CN.md)。
+
 `backtest_runtime.session_stream.run_partition_sessions` 通过一个持续运行的 Rust
 引擎进程，处理已验证的分区输入。这是需要显式调用的 Python API，要求 Linux 和支持
 `session-stream` 的引擎版本。现有 v1-v6 排队任务、指纹、资源预算、Go 控制接口与网关

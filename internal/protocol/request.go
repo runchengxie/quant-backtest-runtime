@@ -258,8 +258,8 @@ func Decode(b []byte) (*Request, error) {
 		return nil, e
 	}
 	v, e := int64Value(m["schema_version"])
-	if e != nil || v < 5 || v > 6 {
-		return nil, fail("native requests require schema_version 5 or 6; legacy requests require the stateless adapter")
+	if e != nil || v < 5 || v > 7 {
+		return nil, fail("native requests require schema_version 5, 6 or 7; legacy requests require the stateless adapter")
 	}
 	keys := []string{"schema_version", "idempotency_key", "backend", "evidence_tier", "inputs", "config", "execution", "budgets"}
 	if _, ok := m["quant_run_manifest_ref"]; ok {
@@ -279,6 +279,9 @@ func Decode(b []byte) (*Request, error) {
 	if v == 6 {
 		backend = "nautilus.session_replay"
 	}
+	if v == 7 {
+		backend = "nautilus.partition_session_replay"
+	}
 	if m["backend"] != backend || m["evidence_tier"] != "diagnostic" {
 		return nil, fail("invalid backend or evidence_tier")
 	}
@@ -286,7 +289,19 @@ func Decode(b []byte) (*Request, error) {
 	if e != nil {
 		return nil, e
 	}
-	if e = exact(in, "engine_request_ref"); e != nil || !artifact(in["engine_request_ref"]) {
+	inputKeys := []string{"engine_request_ref"}
+	if v == 7 {
+		inputKeys = []string{"engine_config_ref", "partition_manifest_ref"}
+	}
+	if e = exact(in, inputKeys...); e != nil {
+		return nil, fail("invalid engine inputs")
+	}
+	for _, key := range inputKeys {
+		if !artifact(in[key]) {
+			return nil, fail("invalid engine inputs")
+		}
+	}
+	if v == 7 && m["quant_run_manifest_ref"] != nil {
 		return nil, fail("invalid engine inputs")
 	}
 	c, e := object(m["config"])
@@ -347,7 +362,7 @@ func importMapping(m map[string]any, raw, digest string) (*Request, error) {
 		return nil, fail("request exceeds 64 KiB")
 	}
 	v, e := int64Value(m["schema_version"])
-	if e != nil || v < 1 || v > 6 {
+	if e != nil || v < 1 || v > 7 {
 		return nil, fail("invalid schema_version")
 	}
 	k, ok := m["idempotency_key"].(string)

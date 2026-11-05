@@ -71,7 +71,7 @@ func resolveArtifact(root, ref string) (string, error) {
 }
 func legacyCall(ctx context.Context, o Options, operation string, request []byte, extra ...string) (map[string]any, error) {
 	if o.PythonExecutable == "" || !filepath.IsAbs(o.PythonExecutable) {
-		return nil, failure("LEGACY_DEPENDENCY_UNAVAILABLE", "configure --python-executable with an installed quant-backtest-runtime[legacy] environment")
+		return nil, failure("LEGACY_DEPENDENCY_UNAVAILABLE", "configure --python-executable with an installed quant-backtest-runtime environment (legacy extra for v1-v4)")
 	}
 	file, e := os.OpenFile(o.PythonExecutable, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if e != nil {
@@ -100,14 +100,27 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 	if e = tmp.Close(); e != nil {
 		return nil, e
 	}
-	args := []string{"-m", "backtest_runtime.go_adapter", operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
+	module := "backtest_runtime.go_adapter"
+	var version struct {
+		SchemaVersion int `json:"schema_version"`
+	}
+	if e = json.Unmarshal(request, &version); e != nil {
+		return nil, e
+	}
+	if version.SchemaVersion == 7 {
+		module = "backtest_runtime.queued_session_adapter"
+	}
+	args := []string{"-m", module, operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
 	if o.EngineExecutable != "" {
 		args = append(args, "--engine-executable", o.EngineExecutable)
+	}
+	if version.SchemaVersion == 7 {
+		args = append(args, "--partition-root", o.PartitionRoot)
 	}
 	args = append(args, extra...)
 	timeout := time.Minute
 	memory := 0
-	if operation == "stage" {
+	if operation == "stage" || version.SchemaVersion == 7 {
 		var parsed struct {
 			Budgets protocol.Budgets `json:"budgets"`
 		}
@@ -116,6 +129,10 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 		}
 		timeout = time.Duration(parsed.Budgets.WallSeconds) * time.Second
 		memory = parsed.Budgets.MemoryMB
+		if operation == "plan" {
+			timeout = 10 * time.Second
+			memory = 256
+		}
 	}
 	output, e := supervisor.Run(ctx, supervisor.Config{Executable: o.PythonExecutable, SHA256: hash(binary), Args: args, MemoryMB: memory, Timeout: timeout, StdoutLimit: 1 << 20, StderrLimit: 8192})
 	if e != nil {
@@ -125,7 +142,11 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 				return nil, failure(code, message)
 			}
 		}
-		return nil, failure("LEGACY_DEPENDENCY_UNAVAILABLE", fmt.Sprintf("legacy adapter %s failed: %s: %s", operation, e, output.Stderr))
+		code := "LEGACY_DEPENDENCY_UNAVAILABLE"
+		if version.SchemaVersion == 7 {
+			code = "BACKEND_EXECUTION_FAILED"
+		}
+		return nil, failure(code, fmt.Sprintf("financial adapter %s failed: %s: %s", operation, e, output.Stderr))
 	}
 	var m map[string]any
 	if e = json.Unmarshal(output.Stdout, &m); e != nil {
@@ -148,7 +169,7 @@ func loadRequest(ctx context.Context, o Options, path string) (*protocol.Request
 	if e = json.Unmarshal(b, &marker); e != nil {
 		return nil, failure("INVALID_REQUEST", e.Error())
 	}
-	if marker.SchemaVersion >= 5 && marker.SchemaVersion <= 6 {
+	if marker.SchemaVersion >= 5 && marker.SchemaVersion <= 7 {
 		r, e := protocol.Decode(b)
 		if e != nil {
 			return nil, failure("INVALID_REQUEST", e.Error())
@@ -174,6 +195,16 @@ func loadRequest(ctx context.Context, o Options, path string) (*protocol.Request
 }
 
 func buildPlan(ctx context.Context, o Options, r *protocol.Request) (map[string]any, error) {
+	if r.SchemaVersion == 7 {
+		if !filepath.IsAbs(o.PartitionRoot) || !filepath.IsAbs(o.EngineExecutable) {
+			return nil, failure("INVALID_REQUEST", "v7 requires absolute operator partition-root and engine-executable")
+		}
+		receipt, e := legacyCall(ctx, o, "plan", []byte(r.CanonicalJSON))
+		if e != nil {
+			return nil, failure("ENGINE_VALIDATION_UNAVAILABLE", e.Error())
+		}
+		return receipt, nil
+	}
 	if _, has := r.Mapping["quant_run_manifest_ref"]; has || r.SchemaVersion < 5 {
 		return legacyCall(ctx, o, "plan", []byte(r.CanonicalJSON))
 	}

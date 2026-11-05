@@ -52,7 +52,8 @@ Native v5 jobs return a final account snapshot. v6 jobs return a daily session
 ledger. Both use the external Rust engine and remain diagnostic evidence.
 Supported trading rules come from that engine. Successful publication does not
 mean every requested order filled or that a strategy is ready for production.
-Raw partition transport v7 is a design proposal, not an active job protocol.
+An explicit [v7 mode](docs/queued-sessions.md) runs bounded verified partition
+sessions through the Go queue with a stateless Python adapter.
 
 Older v1-v4 jobs use an explicitly configured Python compatibility adapter.
 The [installation options](docs/development.md#installation-variants) and

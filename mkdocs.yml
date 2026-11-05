@@ -63,6 +63,7 @@ nav:
       - Runtime language direction: runtime-language.md
       - Verified partition inputs: partition-inputs-v1.md
       - Session process channel: session-stream.md
+      - Queued partition sessions: queued-sessions.md
   - 简体中文:
       - 首页: index.zh-CN.md
       - 回测任务与结果: jobs.zh-CN.md
@@ -73,3 +74,4 @@ nav:
       - Runtime 的语言方向: runtime-language.zh-CN.md
       - 已验证的分区输入: partition-inputs-v1.zh-CN.md
       - 会话进程通道: session-stream.zh-CN.md
+      - 分区会话队列: queued-sessions.zh-CN.md

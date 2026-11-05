@@ -3,6 +3,7 @@
 [English page](go-runtime.md)
 
 Go 版 `backtest-job` CLI 已负责 SQLite 状态、worker 进程、调度和最终结果发布。v5、v6 任务直接调用独立安装的 Rust 引擎，无需 Python。实际使用的实现由部署配置决定。
+显式 [v7 分区会话模式](queued-sessions.zh-CN.md) 使用无状态 Python 适配器，沿用 Go 生命周期控制。
 
 ## 构建与验证
 
