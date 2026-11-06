@@ -47,7 +47,12 @@ type completion struct {
 	err error
 }
 
-func serve(ctx context.Context, o Options) error {
+func serve(ctx context.Context, o Options) (resultErr error) {
+	defer func() {
+		if errors.Is(resultErr, context.Canceled) && ctx.Err() != nil {
+			resultErr = nil
+		}
+	}()
 	if o.CgroupRoot != "" {
 		var err error
 		o.groups, err = jobgroup.New(o.CgroupRoot, o.Database)
@@ -55,7 +60,7 @@ func serve(ctx context.Context, o Options) error {
 			return failure("RESOURCE_LIMIT_UNAVAILABLE", err.Error())
 		}
 	}
-	st, e := store.Open(o.Database, false)
+	st, e := store.OpenScheduler(ctx, o.Database)
 	if e != nil {
 		return e
 	}
@@ -96,6 +101,14 @@ func serve(ctx context.Context, o Options) error {
 	for {
 		if ctx.Err() != nil {
 			stopping = true
+			if len(running) == 0 && len(observed) == 0 {
+				return nil
+			}
+		}
+		if len(running) > 0 || len(observed) > 0 {
+			st.SetRetryContext(context.Background())
+		} else {
+			st.SetRetryContext(ctx)
 		}
 		if e = reconcileGroups(o, st, running, observed); e != nil {
 			return e
@@ -148,6 +161,7 @@ func serve(ctx context.Context, o Options) error {
 		for _, j := range active {
 			if _, owned := running[j.JobID]; !owned && j.WorkerPID != nil {
 				observed[j.JobID] = *j.WorkerPID
+				st.SetRetryContext(context.Background())
 			}
 		}
 		for id, pid := range observed {
@@ -185,24 +199,42 @@ func serve(ctx context.Context, o Options) error {
 				if _, owned := running[j.JobID]; owned || j.LeaseExpiresAt != nil {
 					continue
 				}
+				if ctx.Err() != nil {
+					break
+				}
 				command, err := startWorker(o, st, j.JobID)
 				if err != nil {
+					if store.IsBusy(err) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+						return err
+					}
 					code := "WORKER_START_FAILED"
 					var typed *Error
 					if errors.As(err, &typed) {
 						code = typed.Code
 					}
-					_, _ = st.Finish(j.JobID, "FAILED", "", "", code, err.Error())
+					if _, finishErr := st.Finish(j.JobID, "FAILED", "", "", code, err.Error()); finishErr != nil {
+						return finishErr
+					}
 					continue
 				}
 				if command == nil {
 					continue
 				}
 				running[j.JobID] = command
+				st.SetRetryContext(context.Background())
 				slots++
 				go func(id string, command *exec.Cmd) { done <- completion{id, command.Wait()} }(j.JobID, command)
 			}
 		}
-		time.Sleep(50 * time.Millisecond)
+		if stopping {
+			time.Sleep(50 * time.Millisecond)
+			continue
+		}
+		timer := time.NewTimer(50 * time.Millisecond)
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			timer.Stop()
+		}
 	}
 }

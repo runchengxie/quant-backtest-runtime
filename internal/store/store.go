@@ -42,12 +42,25 @@ type Job struct {
 	StdoutPath        *string  `json:"stdout_path"`
 	StderrPath        *string  `json:"stderr_path"`
 }
-type Store struct{ db *sql.DB }
+type Store struct {
+	db           *sql.DB
+	retryContext context.Context
+	path         string
+}
 
 const schema = `CREATE TABLE IF NOT EXISTS backtest_jobs (job_id TEXT PRIMARY KEY,idempotency_key TEXT NOT NULL UNIQUE,request_json TEXT NOT NULL,request_sha256 TEXT NOT NULL,status TEXT NOT NULL CHECK(status IN ('SUBMITTED','RUNNING','SUCCEEDED','FAILED','CANCELLED')),created_at TEXT NOT NULL,updated_at TEXT NOT NULL,worker_pid INTEGER,lease_expires_at REAL,cancel_requested_at TEXT,result_ref TEXT,result_sha256 TEXT,error_code TEXT,error_message TEXT,stdout_path TEXT,stderr_path TEXT);`
 const columns = `job_id,idempotency_key,request_json,request_sha256,status,created_at,updated_at,worker_pid,lease_expires_at,cancel_requested_at,result_ref,result_sha256,error_code,error_message,stdout_path,stderr_path`
 
 func Open(path string, readOnly bool) (*Store, error) {
+	return open(path, readOnly, nil)
+}
+
+// OpenScheduler bounds and retries transient SQLite contention without changing CLI policy.
+func OpenScheduler(ctx context.Context, path string) (*Store, error) {
+	return open(path, false, ctx)
+}
+
+func open(path string, readOnly bool, retryContext context.Context) (*Store, error) {
 	p, e := filepath.Abs(path)
 	if e != nil {
 		return nil, e
@@ -79,16 +92,21 @@ func Open(path string, readOnly bool) (*Store, error) {
 	u := url.URL{Scheme: "file", Path: p}
 	q := u.Query()
 	q.Set("mode", mode)
-	q.Add("_pragma", "busy_timeout(5000)")
+	if retryContext == nil {
+		q.Add("_pragma", "busy_timeout(5000)")
+	} else {
+		q.Add("_pragma", "busy_timeout(100)")
+	}
 	u.RawQuery = q.Encode()
 	db, e := sql.Open("sqlite", u.String())
 	if e != nil {
 		return nil, e
 	}
 	db.SetMaxOpenConns(1)
-	s := &Store{db: db}
-	if e = db.Ping(); e == nil && !readOnly {
-		_, e = db.Exec(schema)
+	s := &Store{db: db, retryContext: retryContext, path: p}
+	_, e = retry(s, context.Background(), func(ctx context.Context) (struct{}, error) { return struct{}{}, db.PingContext(ctx) })
+	if e == nil && !readOnly {
+		_, e = retry(s, context.Background(), func(ctx context.Context) (sql.Result, error) { return db.ExecContext(ctx, schema) })
 	}
 	if e != nil {
 		db.Close()
@@ -111,10 +129,14 @@ func scan(r scanner) (Job, error) {
 	return j, e
 }
 func (s *Store) Get(id string) (Job, error) {
-	return scan(s.db.QueryRow("SELECT "+columns+" FROM backtest_jobs WHERE job_id=?", id))
+	return retry(s, context.Background(), func(ctx context.Context) (Job, error) {
+		return scan(s.db.QueryRowContext(ctx, "SELECT "+columns+" FROM backtest_jobs WHERE job_id=?", id))
+	})
 }
 func (s *Store) Lookup(key string) (Job, error) {
-	return scan(s.db.QueryRow("SELECT "+columns+" FROM backtest_jobs WHERE idempotency_key=?", key))
+	return retry(s, context.Background(), func(ctx context.Context) (Job, error) {
+		return scan(s.db.QueryRowContext(ctx, "SELECT "+columns+" FROM backtest_jobs WHERE idempotency_key=?", key))
+	})
 }
 func (s *Store) Submit(r *protocol.Request) (Job, bool, error) {
 	if r == nil {
@@ -162,7 +184,9 @@ func (s *Store) Claim(id string, pid int, leaseSeconds float64) (bool, error) {
 	if pid <= 0 || leaseSeconds <= 0 || math.IsNaN(leaseSeconds) || math.IsInf(leaseSeconds, 0) {
 		return false, fmt.Errorf("invalid worker PID or lease")
 	}
-	return changed(s.db.Exec(`UPDATE backtest_jobs SET status='RUNNING',updated_at=?,worker_pid=?,lease_expires_at=? WHERE job_id=? AND status='SUBMITTED' AND cancel_requested_at IS NULL`, now(), pid, clock()+leaseSeconds, id))
+	return retry(s, context.Background(), func(ctx context.Context) (bool, error) {
+		return changed(s.db.ExecContext(ctx, `UPDATE backtest_jobs SET status='RUNNING',updated_at=?,worker_pid=?,lease_expires_at=? WHERE job_id=? AND status='SUBMITTED' AND cancel_requested_at IS NULL`, now(), pid, clock()+leaseSeconds, id))
+	})
 }
 
 var digestPattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -193,7 +217,9 @@ func (s *Store) FinishContext(ctx context.Context, id, status, resultRef, digest
 	if len(runes) > 2000 {
 		message = string(runes[:2000])
 	}
-	return changed(s.db.ExecContext(ctx, `UPDATE backtest_jobs SET status=?,updated_at=?,worker_pid=NULL,lease_expires_at=NULL,result_ref=?,result_sha256=?,error_code=?,error_message=? WHERE job_id=? AND `+condition, status, now(), nullable(resultRef), nullable(digest), nullable(code), nullable(message), id))
+	return retry(s, ctx, func(ctx context.Context) (bool, error) {
+		return changed(s.db.ExecContext(ctx, `UPDATE backtest_jobs SET status=?,updated_at=?,worker_pid=NULL,lease_expires_at=NULL,result_ref=?,result_sha256=?,error_code=?,error_message=? WHERE job_id=? AND `+condition, status, now(), nullable(resultRef), nullable(digest), nullable(code), nullable(message), id))
+	})
 }
 func (s *Store) Cancel(id string) (Job, error) {
 	t := now()
@@ -204,10 +230,15 @@ func (s *Store) Cancel(id string) (Job, error) {
 	return s.Get(id)
 }
 func (s *Store) SetLogs(id, stdout, stderr string) (bool, error) {
-	return changed(s.db.Exec(`UPDATE backtest_jobs SET stdout_path=?,stderr_path=?,updated_at=?,lease_expires_at=? WHERE job_id=? AND status='SUBMITTED'`, stdout, stderr, now(), clock()+60, id))
+	return retry(s, context.Background(), func(ctx context.Context) (bool, error) {
+		return changed(s.db.ExecContext(ctx, `UPDATE backtest_jobs SET stdout_path=?,stderr_path=?,updated_at=?,lease_expires_at=? WHERE job_id=? AND status='SUBMITTED'`, stdout, stderr, now(), clock()+60, id))
+	})
 }
 func (s *Store) list(query string, args ...any) ([]Job, error) {
-	rows, e := s.db.Query("SELECT "+columns+" FROM backtest_jobs "+query, args...)
+	return retry(s, context.Background(), func(ctx context.Context) ([]Job, error) { return s.listContext(ctx, query, args...) })
+}
+func (s *Store) listContext(ctx context.Context, query string, args ...any) ([]Job, error) {
+	rows, e := s.db.QueryContext(ctx, "SELECT "+columns+" FROM backtest_jobs "+query, args...)
 	if e != nil {
 		return nil, e
 	}
@@ -229,10 +260,12 @@ func (s *Store) Expired(t float64) ([]Job, error) {
 	return s.list("WHERE status='RUNNING' AND lease_expires_at<? ORDER BY lease_expires_at,job_id", t)
 }
 func (s *Store) ExpireUnclaimed(t float64) (int, error) {
-	r, e := s.db.Exec(`UPDATE backtest_jobs SET status='FAILED',updated_at=?,worker_pid=NULL,lease_expires_at=NULL,error_code='WORKER_START_EXPIRED',error_message='Worker exited before claiming the submitted job.' WHERE status='SUBMITTED' AND lease_expires_at<?`, now(), t)
-	if e != nil {
-		return 0, e
-	}
-	n, e := r.RowsAffected()
-	return int(n), e
+	return retry(s, context.Background(), func(ctx context.Context) (int, error) {
+		r, e := s.db.ExecContext(ctx, `UPDATE backtest_jobs SET status='FAILED',updated_at=?,worker_pid=NULL,lease_expires_at=NULL,error_code='WORKER_START_EXPIRED',error_message='Worker exited before claiming the submitted job.' WHERE status='SUBMITTED' AND lease_expires_at<?`, now(), t)
+		if e != nil {
+			return 0, e
+		}
+		n, e := r.RowsAffected()
+		return int(n), e
+	})
 }

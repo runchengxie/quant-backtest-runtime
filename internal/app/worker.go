@@ -23,6 +23,9 @@ var jobIDPattern = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f
 
 func workerArgs(o Options, id string) []string {
 	args := []string{"__worker", id, "--database", o.Database, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
+	if o.Command == "serve" {
+		args = append(args, "--queue")
+	}
 	if o.PartitionRoot != "" {
 		args = append(args, "--partition-root", o.PartitionRoot)
 	}
@@ -141,7 +144,13 @@ func worker(parent context.Context, o Options) error {
 	if !jobIDPattern.MatchString(o.Argument) {
 		return failure("INVALID_REQUEST", "invalid worker job ID")
 	}
-	st, e := store.Open(o.Database, false)
+	var st *store.Store
+	var e error
+	if o.Queue {
+		st, e = store.OpenScheduler(parent, o.Database)
+	} else {
+		st, e = store.Open(o.Database, false)
+	}
 	if e != nil {
 		return e
 	}
@@ -161,6 +170,11 @@ func worker(parent context.Context, o Options) error {
 	claimed, e := st.Claim(job.JobID, os.Getpid(), float64(r.Budgets.WallSeconds+30))
 	if e != nil || !claimed {
 		return e
+	}
+	if o.Queue {
+		if e = st.EndStartupRetry(); e != nil {
+			return e
+		}
 	}
 	ctx, cancel := context.WithTimeout(parent, time.Duration(r.Budgets.WallSeconds)*time.Second)
 	defer cancel()

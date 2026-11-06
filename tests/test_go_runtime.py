@@ -725,3 +725,132 @@ def test_scheduled_snapshot_restores_native_results_and_pending_queue(
     assert restored.call("recover")["recovered"] == 0
     assert restored.call("recover")["recovered"] == 0
     assert restored.call("result", completed["job_id"]) == expected
+
+
+def test_scheduler_survives_backup_writer_and_stops_cleanly(runtime: Runtime) -> None:
+    from backtest_runtime.store import JobStore
+
+    JobStore(runtime.database).close()
+    process = subprocess.Popen(
+        runtime.args("serve"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    try:
+        deadline = time.monotonic() + 3
+        while not Path(str(runtime.database) + ".scheduler.lock").exists():
+            assert process.poll() is None
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        with sqlite3.connect(runtime.database, timeout=0) as writer:
+            writer.execute("BEGIN IMMEDIATE")
+            time.sleep(6)
+            assert process.poll() is None, process.communicate()
+            process.send_signal(__import__("signal").SIGINT)
+            stdout, stderr = process.communicate(timeout=2)
+            assert process.returncode == 0, stderr
+            assert json.loads(stdout)["status"] == "STOPPED"
+            assert writer.execute("SELECT count(*) FROM backtest_jobs").fetchone() == (
+                0,
+            )
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.communicate(timeout=8)
+
+
+def test_scheduler_startup_writer_contention_preserves_pending_job(
+    runtime: Runtime,
+) -> None:
+    engine_runtime(runtime)
+    runtime.python = None
+    request = _request(runtime.artifacts, runtime.engine)
+    receipt = runtime.call("submit", str(runtime.write(request)), "--queue")
+    with sqlite3.connect(runtime.database, timeout=0) as writer:
+        writer.execute("BEGIN IMMEDIATE")
+        process = subprocess.Popen(
+            runtime.args("serve", "--once"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            time.sleep(6)
+            assert process.poll() is None, process.communicate()
+            assert writer.execute(
+                "SELECT status,worker_pid FROM backtest_jobs"
+            ).fetchone() == ("SUBMITTED", None)
+            writer.rollback()
+            stdout, stderr = process.communicate(timeout=15)
+            assert process.returncode == 0, (stdout, stderr)
+            assert runtime.wait(receipt["job_id"])["status"] == "SUCCEEDED"
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.communicate(timeout=8)
+
+
+def test_queued_worker_startup_claim_retries_writer(runtime: Runtime) -> None:
+    engine_runtime(runtime)
+    runtime.python = None
+    mapping = _request(runtime.artifacts, runtime.engine)
+    receipt = runtime.call("submit", str(runtime.write(mapping)), "--queue")
+    with sqlite3.connect(runtime.database, timeout=0) as writer:
+        writer.execute("BEGIN IMMEDIATE")
+        process = subprocess.Popen(
+            runtime.args("__worker", receipt["job_id"], "--queue"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            time.sleep(6)
+            assert process.poll() is None, process.communicate()
+            assert writer.execute(
+                "SELECT status,worker_pid FROM backtest_jobs"
+            ).fetchone() == ("SUBMITTED", None)
+            writer.rollback()
+            stdout, stderr = process.communicate(timeout=15)
+            assert process.returncode == 0, (stdout, stderr)
+            assert runtime.wait(receipt["job_id"])["status"] == "SUCCEEDED"
+            assert (
+                runtime.call("submit", str(runtime.root / "request.json"), "--queue")[
+                    "job_id"
+                ]
+                == receipt["job_id"]
+            )
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                process.communicate(timeout=8)
+
+
+def test_scheduler_drains_active_child_during_signal_and_writer_lock(
+    runtime: Runtime,
+) -> None:
+    engine_runtime(runtime)
+    runtime.python = None
+    marker = delayed_engine(runtime, gate=True)
+    mapping = _request(runtime.artifacts, runtime.engine)
+    mapping["budgets"]["wall_seconds"] = 30
+    receipt = runtime.call("submit", str(runtime.write(mapping)), "--queue")
+    process = subprocess.Popen(
+        runtime.args("serve"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    )
+    try:
+        wait_marker(marker)
+        with sqlite3.connect(runtime.database, timeout=0) as writer:
+            writer.execute("BEGIN IMMEDIATE")
+            process.terminate()
+            (runtime.root / "release").touch()
+            time.sleep(2)
+            assert process.poll() is None, process.communicate()
+            writer.rollback()
+        stdout, stderr = process.communicate(timeout=15)
+        assert process.returncode == 0, (stdout, stderr)
+        assert runtime.wait(receipt["job_id"])["status"] == "SUCCEEDED"
+        assert runtime.call("result", receipt["job_id"])["job_id"] == receipt["job_id"]
+        assert len(marker.read_text().splitlines()) == 1
+    finally:
+        (runtime.root / "release").touch()
+        if process.poll() is None:
+            process.terminate()
+            process.communicate(timeout=15)

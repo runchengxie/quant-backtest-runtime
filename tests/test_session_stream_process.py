@@ -5,7 +5,41 @@ import json
 import os
 from pathlib import Path
 
+import pytest
 from test_session_stream import config_sessions, fake_engine, run, source
+
+
+def _active_process(pid):
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split(") ", 1)[1][0] != "Z"
+    except (FileNotFoundError, ProcessLookupError):
+        return False
+
+
+@pytest.mark.parametrize("state, expected", [("R", True), ("Z", False)])
+def test_process_poll_classifies_kernel_state(monkeypatch, state, expected):
+    monkeypatch.setattr(Path, "read_text", lambda self: f"123 (engine) {state} 1 2")
+    assert _active_process(123) is expected
+
+
+@pytest.mark.parametrize("error", [FileNotFoundError(), ProcessLookupError()])
+def test_process_poll_treats_disappearing_process_as_inactive(monkeypatch, error):
+    def disappeared(self):
+        raise error
+
+    monkeypatch.setattr(Path, "read_text", disappeared)
+    assert _active_process(123) is False
+
+
+@pytest.mark.parametrize("error", [PermissionError(), OSError("unexpected I/O error")])
+def test_process_poll_does_not_hide_unexpected_errors(monkeypatch, error):
+    def failed(self):
+        raise error
+
+    monkeypatch.setattr(Path, "read_text", failed)
+    with pytest.raises(type(error)) as caught:
+        _active_process(123)
+    assert caught.value is error
 
 
 def test_parent_sigkill_kills_engine_and_resume_replays_all_prefix(tmp_path):
@@ -61,18 +95,9 @@ run_partition_sessions(source(root,sessions),config,executable=root/"engine",exe
         child.wait(timeout=5)
         deadline = time.monotonic() + 5
 
-        def active():
-            try:
-                return (
-                    Path(f"/proc/{engine_pid}/stat").read_text().split(") ", 1)[1][0]
-                    != "Z"
-                )
-            except FileNotFoundError:
-                return False
-
-        while active() and time.monotonic() < deadline:
+        while _active_process(engine_pid) and time.monotonic() < deadline:
             time.sleep(0.02)
-        assert not active()
+        assert not _active_process(engine_pid)
     finally:
         if child.poll() is None:
             child.kill()
@@ -201,12 +226,6 @@ ledger=[]; seq=0""",
         pid = int(pidfile.read_text())
         deadline = time.monotonic() + 5
 
-        def active():
-            try:
-                return Path(f"/proc/{pid}/stat").read_text().split(") ", 1)[1][0] != "Z"
-            except FileNotFoundError:
-                return False
-
-        while active() and time.monotonic() < deadline:
+        while _active_process(pid) and time.monotonic() < deadline:
             time.sleep(0.01)
-        assert not active()
+        assert not _active_process(pid)

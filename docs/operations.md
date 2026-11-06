@@ -162,8 +162,13 @@ PIDs/leases, unsupported request schemas, changed fingerprints, missing or alter
 inputs/results, overlapping roots, symlinks and hardlinks. The writer reservation
 closes the idle-check/admission race while a separate read-only SQLite connection
 uses the backup API. New job transitions may wait during this interval; the
-configured userspace deadline cannot exceed 30 seconds. Normal I/O failures or
-timeouts leave previous snapshots intact. Hard interruption may leave a hidden
+configured userspace deadline cannot exceed 30 seconds. The Go scheduler retries
+only typed SQLite busy/locked errors, using short driver waits and paced backoff
+within a 35-second bound per database operation. Idle shutdown interrupts these
+waits; an owned or observed child retains a separate bounded drain context for
+completion and cleanup. Ordinary CLI waits and worker execution deadlines are
+unchanged. A lock that outlasts the bound remains a visible error.
+Normal I/O failures or timeouts leave previous snapshots intact. Hard interruption may leave a hidden
 `.incomplete-*` directory, which status ignores; inspect it before manual cleanup.
 
 A completed `snapshot-*` directory contains `manifest.json` and `data/`. Its scope
@@ -192,3 +197,11 @@ restored owners. The synthetic test
 `test_scheduled_snapshot_restores_native_results_and_pending_queue` exercises this
 sequence with the real Go CLI and pinned Rust engine after moving the source away;
 it does not validate a deployment's disk, external retention or monitoring.
+
+Before rolling back to a release without this backup utility or contention handling,
+stop and disable its backup timer and wait for any backup service to exit before
+switching releases. Preserve all snapshots. Verify them read-only with `--status`
+from a retained compatible fixed release, rather than assuming the rollback's
+`current` path contains the utility. Stop an idle scheduler before acquiring any
+operator writer reservation; never hold that reservation across scheduler stop
+or restart.
