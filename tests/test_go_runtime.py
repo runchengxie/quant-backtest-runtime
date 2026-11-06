@@ -670,3 +670,58 @@ def test_offline_backup_restores_results_queue_and_idempotency(
     assert restored.call("recover")["recovered"] == 0
     assert restored.call("recover")["recovered"] == 0
     assert restored.call("result", job_id) == result
+
+
+def test_scheduled_snapshot_restores_native_results_and_pending_queue(
+    runtime: Runtime,
+) -> None:
+    """The restricted scheduled bundle is usable after the source disappears."""
+    import shutil
+
+    from backtest_runtime.backup import snapshot, status
+
+    engine_runtime(runtime)
+    runtime.python = None
+    mapping = _request(runtime.artifacts, runtime.engine)
+    mapping.update(schema_version=6, backend="nautilus.session_replay")
+    mapping["inputs"]["engine_request_ref"] = _put(
+        runtime.artifacts, json.dumps(_session_request()).encode()
+    )
+    completed = runtime.call("submit", str(runtime.write(mapping)), "--queue")
+    runtime.call("serve", "--once")
+    assert runtime.wait(completed["job_id"])["status"] == "SUCCEEDED"
+    expected = runtime.call("result", completed["job_id"])
+    queued = {**mapping, "idempotency_key": "scheduled-pending"}
+    pending = runtime.call("submit", str(runtime.write(queued, "queued")), "--queue")
+    config = {
+        "runtime": {
+            "queue": True,
+            "database": str(runtime.database),
+            "artifact_root": str(runtime.artifacts),
+            "result_root": str(runtime.results),
+        },
+        "backup": {"root": str(runtime.root.parent / f"{runtime.root.name}-snapshots")},
+    }
+    bundle = snapshot(config)
+    assert status(config)["jobs"] == 2
+    restore_root = runtime.root.parent / f"{runtime.root.name}-restored"
+    shutil.copytree(bundle / "data", restore_root)
+    runtime.root.rename(runtime.root.with_name(f"{runtime.root.name}-offline"))
+    restored = Runtime(runtime.executable, restore_root, runtime.engine, python=None)
+    assert restored.call("result", completed["job_id"]) == expected
+    assert (
+        restored.call("submit", str(restored.write(mapping)), "--queue")["job_id"]
+        == completed["job_id"]
+    )
+    assert (
+        restored.call("submit", str(restored.write(queued, "queued")), "--queue")[
+            "job_id"
+        ]
+        == pending["job_id"]
+    )
+    restored.call("serve", "--once")
+    assert restored.wait(pending["job_id"])["status"] == "SUCCEEDED"
+    assert restored.call("result", pending["job_id"])["summary"] == expected["summary"]
+    assert restored.call("recover")["recovered"] == 0
+    assert restored.call("recover")["recovered"] == 0
+    assert restored.call("result", completed["job_id"]) == expected
