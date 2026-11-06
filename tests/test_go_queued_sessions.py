@@ -121,12 +121,22 @@ def test_invalid_preflight_creates_no_database(queued):
 def test_queued_lifecycle_controls(queued, action):
     binary, _ = fake_engine(queued.root)
     # Start/ready works during preflight; computation blocks on first session.
+    # Publish the replacement PID atomically so readers never see a truncated file.
     pidfile = queued.root / "engine.pid"
     binary.write_text(
         binary.read_text()
         .replace('session=data["session"]', 'time.sleep(30); session=data["session"]')
         .replace(
-            "MODE = ", f'open({str(pidfile)!r}, "w").write(str(os.getpid()))\nMODE = '
+            "MODE = ",
+            f"pidfile = {str(pidfile)!r}\n"
+            'pidtmp = pidfile + "." + str(os.getpid()) + ".tmp"\n'
+            "try:\n"
+            '    with open(pidtmp, "w") as target:\n'
+            "        target.write(str(os.getpid()))\n"
+            "    os.replace(pidtmp, pidfile)\n"
+            "finally:\n"
+            "    if os.path.exists(pidtmp):\n"
+            "        os.unlink(pidtmp)\nMODE = ",
         )
     )
     queued.engine = binary

@@ -205,16 +205,43 @@ func TestHeldExecutableAgainstReplacement(t *testing.T) {
 }
 func TestWorkerProcess(t *testing.T) {
 	if os.Getenv("SUPERVISOR_WORKER_TEST") == "1" {
+		if os.Getenv("SUPERVISOR_WORKER_READY") == "1" {
+			ready := os.NewFile(3, "worker-ready")
+			if _, e := ready.Write([]byte{1}); e != nil {
+				t.Fatal(e)
+			}
+			if e := ready.Close(); e != nil {
+				t.Fatal(e)
+			}
+		}
 		time.Sleep(30 * time.Second)
 	}
 }
 func TestWorkerIdentityAndSignal(t *testing.T) {
+	ready, writer, e := os.Pipe()
+	if e != nil {
+		t.Fatal(e)
+	}
+	t.Cleanup(func() { _ = ready.Close(); _ = writer.Close() })
 	cmd := exec.Command(os.Args[0], "-test.run=^TestWorkerProcess$", "--", "__worker", "owned-job")
-	cmd.Env = append(os.Environ(), "SUPERVISOR_WORKER_TEST=1")
+	cmd.Env = append(os.Environ(), "SUPERVISOR_WORKER_TEST=1", "SUPERVISOR_WORKER_READY=1")
+	cmd.ExtraFiles = []*os.File{writer}
 	if e := cmd.Start(); e != nil {
 		t.Fatal(e)
 	}
-	defer func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }()
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _ = cmd.Wait() })
+	if e := writer.Close(); e != nil {
+		t.Fatal(e)
+	}
+	// Start may return while the child still has its fork parent's command line.
+	// Inspect the worker only after its own helper has announced readiness.
+	if e := ready.SetReadDeadline(time.Now().Add(5 * time.Second)); e != nil {
+		t.Fatal(e)
+	}
+	var token [1]byte
+	if n, e := ready.Read(token[:]); e != nil || n != 1 || token[0] != 1 {
+		t.Fatalf("worker readiness: %d %v %v", n, token, e)
+	}
 	if alive, e := WorkerAlive(cmd.Process.Pid, "owned-job"); e != nil || !alive {
 		t.Fatalf("alive %t %v", alive, e)
 	}
