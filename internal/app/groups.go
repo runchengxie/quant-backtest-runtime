@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
@@ -87,6 +88,7 @@ func reconcileGroups(o Options, st *store.Store, running map[string]*exec.Cmd, o
 			}
 			if alive {
 				observed[id] = *job.WorkerPID
+				st.SetRetryContext(context.Background())
 				continue
 			}
 		}
