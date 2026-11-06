@@ -98,6 +98,22 @@ def test_valid_session_result_reconciles_realized_cash_and_daily_holdings() -> N
 @pytest.mark.parametrize(
     "mutation",
     [
+        pytest.param(
+            lambda v: v["daily_ledger"][0].update(session_date="2025-02-30"),
+            id="impossible-session-date",
+        ),
+        pytest.param(
+            lambda v: v["daily_ledger"][1].update(session_date="2025-01-01"),
+            id="duplicate-session-date",
+        ),
+        pytest.param(
+            lambda v: v["daily_positions"][0].update(session_date="2025-01-03"),
+            id="position-outside-ledger",
+        ),
+        pytest.param(
+            lambda v: v["daily_ledger"][1].update(valuation_ts_ns=1735862401000000000),
+            id="valuation-on-wrong-date",
+        ),
         lambda v: v.update(currency="EUR"),
         lambda v: v.update(valuation_timezone="Asia/Shanghai"),
         lambda v: v.update(enforce_t1=1),

@@ -578,3 +578,95 @@ def test_go_legacy_normalization_is_claimed_and_cancellable(runtime: Runtime) ->
         if scheduler.poll() is None:
             scheduler.terminate()
             scheduler.communicate(timeout=15)
+
+
+def test_offline_backup_restores_results_queue_and_idempotency(
+    runtime: Runtime,
+) -> None:
+    """A quiescent bundle can move roots without losing lifecycle authority."""
+    import hashlib
+    import shutil
+
+    engine_runtime(runtime)
+    runtime.python = None
+    mapping = _request(runtime.artifacts, runtime.engine)
+    mapping.update(schema_version=6, backend="nautilus.session_replay")
+    mapping["inputs"]["engine_request_ref"] = _put(
+        runtime.artifacts, json.dumps(_session_request()).encode()
+    )
+    completed_path = runtime.write(mapping, "completed")
+    plan = runtime.call("plan", str(completed_path))
+    runtime.write(plan, "plan")
+    completed = runtime.call(
+        "submit",
+        str(completed_path),
+        "--queue",
+        "--expected-plan-sha256",
+        plan["plan_sha256"],
+    )
+    job_id = completed["job_id"]
+    # Scheduler returns only after command.Wait completes for every owned worker.
+    # A terminal database status alone would not prove process/log quiescence.
+    runtime.call("serve", "--once")
+    assert runtime.wait(job_id)["status"] == "SUCCEEDED"
+    result = runtime.call("result", job_id)
+    queued_mapping = {**mapping, "idempotency_key": "offline-pending"}
+    pending = runtime.call(
+        "submit", str(runtime.write(queued_mapping, "pending")), "--queue"
+    )
+    assert runtime.call("status", pending["job_id"])["status"] == "SUBMITTED"
+    (runtime.root / "receipts.json").write_text(json.dumps([completed, pending]))
+
+    # All CLI writers have exited and no worker remains active. SQLite backup
+    # includes committed WAL content; copying just the main file is insufficient.
+    backup = runtime.root.parent / f"{runtime.root.name}-backup"
+    backup.mkdir()
+    with (
+        sqlite3.connect(f"{runtime.database.as_uri()}?mode=ro", uri=True) as source,
+        sqlite3.connect(backup / "jobs.sqlite") as target,
+    ):
+        source.backup(target)
+        assert target.execute("PRAGMA integrity_check").fetchone() == ("ok",)
+    for name in ("artifacts", "results"):
+        shutil.copytree(runtime.root / name, backup / name)
+    for name in ("completed.json", "pending.json", "plan.json", "receipts.json"):
+        shutil.copy2(runtime.root / name, backup / name)
+    inventory = {
+        str(path.relative_to(backup)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in backup.rglob("*")
+        if path.is_file()
+    }
+    restored_root = runtime.root.parent / f"{runtime.root.name}-restored"
+    shutil.copytree(backup, restored_root)
+    assert {
+        str(path.relative_to(restored_root)): hashlib.sha256(
+            path.read_bytes()
+        ).hexdigest()
+        for path in restored_root.rglob("*")
+        if path.is_file()
+    } == inventory
+    # Moving the original prevents accidental reads from its former absolute path.
+    runtime.root.rename(runtime.root.with_name(f"{runtime.root.name}-offline"))
+    restored = Runtime(runtime.executable, restored_root, runtime.engine, python=None)
+    assert restored.call("result", job_id) == result
+    assert restored.call("plan", str(restored_root / "completed.json")) == plan
+    assert json.loads((restored_root / "receipts.json").read_text()) == [
+        completed,
+        pending,
+    ]
+    assert (
+        restored.call("submit", str(restored_root / "completed.json"))["job_id"]
+        == job_id
+    )
+    assert (
+        restored.call("submit", str(restored_root / "pending.json"), "--queue")[
+            "job_id"
+        ]
+        == pending["job_id"]
+    )
+    restored.call("serve", "--once")
+    assert restored.wait(pending["job_id"])["status"] == "SUCCEEDED"
+    assert restored.call("result", pending["job_id"])["summary"] == result["summary"]
+    assert restored.call("recover")["recovered"] == 0
+    assert restored.call("recover")["recovered"] == 0
+    assert restored.call("result", job_id) == result

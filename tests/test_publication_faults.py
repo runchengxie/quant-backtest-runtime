@@ -77,14 +77,30 @@ def test_stale_worker_cannot_publish_after_recovery_and_corruption_is_rejected(
             result_root=tmp_path / "results",
         )
     assert not (tmp_path / "results" / job_id).exists()
+    result = _result()
+    frame = result.frames()["daily"]
+    result.frames = lambda: dict.fromkeys(
+        ("performance", "positions", "orders", "fills", "daily_ledger"), frame
+    )
     _, digest = worker._write_result(
-        _result(),
+        result,
         job_id=job_id,
         request=request,
         service=service,
         result_root=tmp_path / "results",
     )
-    (tmp_path / "results" / job_id / "manifest.json").write_text("{}", encoding="utf-8")
+    assert (
+        read_job_result(
+            tmp_path / "results",
+            job_id=job_id,
+            manifest_sha256=digest,
+            request_sha256=request.request_sha256,
+        )["job_id"]
+        == job_id
+    )
+    manifest = tmp_path / "results" / job_id / "manifest.json"
+    # Keep identity/schema valid so only the exact-byte digest detects tampering.
+    manifest.write_bytes(manifest.read_bytes() + b" ")
     with pytest.raises(ValueError, match="SHA-256"):
         read_job_result(
             tmp_path / "results",
