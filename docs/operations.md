@@ -111,3 +111,84 @@ root away, restores SQLite plus immutable inputs/results and receipts, reads the
 completed result, continues queued work and verifies idempotency and repeated recovery.
 The test covers synthetic v6 jobs. It does not certify a deployment's storage,
 external receipt retention, v7 partition relocation or backup scheduling.
+
+## Restricted scheduled snapshots
+
+For an exclusively queue-managed native v5/v6 deployment, run the dependency-free
+utility from a stable release path with Python 3.12 or newer:
+
+```sh
+python3 /srv/quant-backtest-runtime/current/scripts/backup_runtime.py --config /private/runtime.toml
+python3 /srv/quant-backtest-runtime/current/scripts/backup_runtime.py --config /private/runtime.toml --status
+```
+
+Use the same `runtime` table as the scheduler and add a `backup` table. All paths
+must be absolute. The backup root must be owned by the service user with mode
+`0700`, outside and disjoint from the configured source roots. Files are private.
+
+```toml
+[runtime]
+queue = true
+database = "/data/runtime/jobs.sqlite"
+artifact_root = "/data/runtime/artifacts"
+result_root = "/data/runtime/results"
+
+[backup]
+root = "/backups/runtime"
+max_seconds = 30
+max_age_seconds = 7200
+
+[backup.metadata]
+runtime_revision = "<full merged source revision>"
+engine_revision = "<full pinned provider revision>"
+engine_sha256 = "<retained engine executable SHA-256>"
+```
+
+Schedule hourly as an operator-owned oneshot service, with an independent hard
+service timeout (for example 40 seconds). Run `--status` after creation and in
+regular monitoring. A nonzero exit, including an idle check, is a visible failed
+attempt: investigate it rather than treating it as a fresh backup. Status verifies
+**the newest** published snapshot's complete file inventory, SQLite integrity and
+age (default two hours); it never falls back silently to an older valid snapshot.
+No backups are automatically deleted, and there is no mutable `latest` pointer.
+Monitor capacity and arrange a separate reviewed off-host copy. A copy on the same
+filesystem does not protect against loss of that filesystem. A self-created hash
+inventory cannot establish independent provenance or resist an attacker who can
+rewrite both data and manifest.
+
+The utility takes a nonblocking destination lock and a SQLite `BEGIN IMMEDIATE`
+writer reservation with zero wait. It rejects running jobs, submitted worker
+PIDs/leases, unsupported request schemas, changed fingerprints, missing or altered
+inputs/results, overlapping roots, symlinks and hardlinks. The writer reservation
+closes the idle-check/admission race while a separate read-only SQLite connection
+uses the backup API. New job transitions may wait during this interval; the
+configured userspace deadline cannot exceed 30 seconds. Normal I/O failures or
+timeouts leave previous snapshots intact. Hard interruption may leave a hidden
+`.incomplete-*` directory, which status ignores; inspect it before manual cleanup.
+
+A completed `snapshot-*` directory contains `manifest.json` and `data/`. Its scope
+is exactly SQLite job state, request JSON and fingerprints, referenced engine-input
+CAS files under `data/artifacts/sha256/`, and verified successful result directories
+under `data/results/`. Files and directories are synced before an atomic rename;
+the parent is then synced. Queued jobs and idempotency survive restoration.
+Unpublished/orphan result directories, logs, staging, unreferenced artifacts,
+external request/plan/receipt files, runtime/engine executables and environments
+are omitted. Retain pinned releases and externally retained receipts separately.
+The optional metadata is operator-supplied context, not an attestation of binaries.
+Legacy v1-v4 and partition-backed v7 jobs fail the **whole** attempt; they are never
+silently omitted. Only exclusively queued submissions are supported; `queue=true`
+is an operator assertion, not enforcement of other clients' behavior.
+
+This restricted snapshot does not replace the full offline backup procedure above.
+To restore, stop all source submissions, schedulers and workers first. Verify the
+snapshot with `--status`, copy `data/` to a new empty restore root, verify its hashes
+against `manifest.json` and SQLite integrity, and supply the restored database,
+artifact and result paths explicitly. Absolute stored log paths are historical and
+refer to omitted files. Before enabling scheduling, use the retained compatible
+runtime/engine bytes to read every successful `result`, compare IDs/fingerprints,
+and resubmit unchanged saved requests with `--queue` to verify idempotency. Then
+continue pending jobs and check repeated recovery. Never run both source and
+restored owners. The synthetic test
+`test_scheduled_snapshot_restores_native_results_and_pending_queue` exercises this
+sequence with the real Go CLI and pinned Rust engine after moving the source away;
+it does not validate a deployment's disk, external retention or monitoring.

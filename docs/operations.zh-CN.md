@@ -100,3 +100,72 @@ v7 还需复制分区目录并保留相对路径。保留权限；拒绝符号�
 使用真实 Go CLI 和固定 Rust 引擎验证这一边界：移走原目录，恢复 SQLite、
 不可变输入、结果和回执，读取已完成结果，继续排队任务，并验证幂等性和重复恢复。
 测试使用合成 v6 任务，不代表部署存储、外部回执保留、v7 分区迁移或备份调度已获验证。
+
+## 受限的定时快照
+
+仅通过队列调度、任务均为原生 v5/v6 的部署，可以使用稳定发布路径中的工具。
+工具只依赖 Python 3.12 及以上版本的标准库：
+
+```sh
+python3 /srv/quant-backtest-runtime/current/scripts/backup_runtime.py --config /private/runtime.toml
+python3 /srv/quant-backtest-runtime/current/scripts/backup_runtime.py --config /private/runtime.toml --status
+```
+
+沿用调度器的 `runtime` 配置表，并增加 `backup` 表。所有路径必须为绝对路径；
+备份根目录必须归服务用户所有、权限为 `0700`，且与各个源目录互不包含。
+备份文件默认仅当前用户可读写。
+
+```toml
+[runtime]
+queue = true
+database = "/data/runtime/jobs.sqlite"
+artifact_root = "/data/runtime/artifacts"
+result_root = "/data/runtime/results"
+
+[backup]
+root = "/backups/runtime"
+max_seconds = 30
+max_age_seconds = 7200
+
+[backup.metadata]
+runtime_revision = "<已合并的完整源码版本>"
+engine_revision = "<固定引擎的完整源码版本>"
+engine_sha256 = "<单独保留的引擎可执行文件 SHA-256>"
+```
+
+由部署方配置每小时执行一次的 oneshot 服务，另设独立的服务超时，例如 40 秒。
+每次备份后以及日常监控中都应执行 `--status`。任何非零退出，包括未满足空闲条件，
+都表示本次尝试失败，不能视为备份已更新。状态检查会校验**最新**已发布快照的完整
+文件清单、SQLite 完整性和保存时间，默认有效期为两小时；最新快照损坏时不会退回
+旧快照并报告成功。工具不会自动删除备份，也不维护可变的 `latest` 指针。
+应监控磁盘容量，并另行审核、安排异机复制。同一文件系统内的备份无法应对整个
+文件系统丢失；自行生成的哈希清单也不是独立的来源证明，不能防止攻击者同时改写
+文件和清单。
+
+工具先获取备份目录的非阻塞排他锁，再通过零等待的 SQLite `BEGIN IMMEDIATE`
+取得写入保留锁。存在运行中任务、已提交任务带有 worker PID 或租约、不支持的请求
+版本、请求指纹变化、输入或结果缺失/损坏、路径重叠、符号链接或硬链接时，整次备份
+失败。持锁期间使用另一条只读连接调用 SQLite backup API，避免“检查空闲后又有
+新任务开始”的竞争。新任务状态写入可能短暂等待；用户态超时上限为 30 秒。
+普通 I/O 错误或超时不会替换旧快照。强制中断可能留下隐藏的 `.incomplete-*`
+目录，状态检查会忽略它；手动清理前应先检查。
+
+完整的 `snapshot-*` 目录包含 `manifest.json` 和 `data/`。范围仅包括 SQLite
+任务状态、请求 JSON 和指纹、`data/artifacts/sha256/` 中被引用的引擎输入，以及
+`data/results/` 中已经校验的成功结果。文件和目录同步后原子重命名，再同步父目录。
+恢复后仍保留排队任务和幂等性。未发布或孤立的结果目录、日志、暂存目录、未引用的
+输入、外部请求/计划/回执文件、runtime/引擎程序及环境都不在其中，固定发布版本和
+外部回执必须单独保留。可选 metadata 只是操作人员填写的上下文，不是程序字节证明。
+出现旧版 v1-v4 或依赖分区的 v7 任务时，**整次**备份失败，不会默默跳过这些任务。
+`queue=true` 是部署方对所有提交都走队列的承诺，工具无法限制其他客户端的行为。
+
+此快照不能替代上面的完整离线备份流程。恢复前先停止源端提交、调度器和 worker。
+用 `--status` 校验快照，将 `data/` 复制到全新的空恢复目录，再按 `manifest.json`
+校验副本哈希和 SQLite 完整性，并显式指定恢复后的数据库、输入和结果路径。
+数据库内的绝对日志路径仅为历史记录，对应日志并未备份。启动调度前，使用单独保留的
+兼容 runtime/引擎逐一读取所有成功任务的 `result`，核对 ID 和指纹，再以 `--queue`
+重提保存的原请求，确认幂等性，然后继续待执行任务并重复检查恢复操作。
+禁止同时运行源端和恢复端两个所有者。合成测试
+`test_scheduled_snapshot_restores_native_results_and_pending_queue` 会移走源目录，
+用真实 Go CLI 和固定 Rust 引擎检查上述恢复过程；它不能验证部署磁盘、外部文件
+保留或监控配置。
