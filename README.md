@@ -12,6 +12,10 @@ simulates trades. Strategies and research decisions belong to callers.
 [quant-platform](https://github.com/runchengxie/quant-platform) supplies the optional
 Python backends for older jobs. See [repository ownership](docs/ownership.md).
 
+Cross-repository workflows and terminal/API status views live in
+[quant-task-orchestrator](https://github.com/runchengxie/quant-task-orchestrator).
+It calls the existing Runtime CLI; worker and result ownership stays here.
+
 ## Run a synthetic job
 
 Use a source checkout on Linux, Go 1.27.3 and Python 3.12+ for the check script

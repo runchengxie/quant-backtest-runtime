@@ -13,6 +13,10 @@ Go 命令行负责管理任务，单独安装的
 [quant-platform](https://github.com/runchengxie/quant-platform)提供旧任务可选的 Python 后端。
 详见[仓库职责](docs/ownership.zh-CN.md)。
 
+跨仓库工作流与终端/API 统一状态视图由
+[quant-task-orchestrator](https://github.com/runchengxie/quant-task-orchestrator)提供。
+协调器调用现有 Runtime CLI，worker 与结果的权威状态仍由本仓库维护。
+
 ## 运行一个合成任务
 
 需要 Linux 源码仓库、Go 1.27.3，以及运行检查脚本的 Python 3.12 或更新版本。
