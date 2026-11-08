@@ -106,7 +106,7 @@ func open(path string, readOnly bool, retryContext context.Context) (*Store, err
 	s := &Store{db: db, retryContext: retryContext, path: p}
 	_, e = retry(s, context.Background(), func(ctx context.Context) (struct{}, error) { return struct{}{}, db.PingContext(ctx) })
 	if e == nil && !readOnly {
-		_, e = retry(s, context.Background(), func(ctx context.Context) (sql.Result, error) { return db.ExecContext(ctx, schema) })
+		_, e = retry(s, context.Background(), func(ctx context.Context) (sql.Result, error) { return db.ExecContext(ctx, schema+checkpointSchema) })
 	}
 	if e != nil {
 		db.Close()

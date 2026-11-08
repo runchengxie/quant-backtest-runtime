@@ -38,7 +38,7 @@ The v1–v4 protocol golden tests use immutable synthetic inputs in `tests/fixtu
 
 ## Dependency audit
 
-The legacy extra keeps quant-platform at reviewed compatibility baseline `15ec62b66e894395d694049eaaace931de4a1265`. Upgrade that provider only after its own dependency refresh is reviewed, merged and validated against these legacy protocols; package upgrades here do not select an arbitrary provider head.
+The legacy extra keeps quant-platform at reviewed compatibility baseline `7a618bddd8fdeee5dbe37fe5b54a9698e0de5355`. Upgrade that provider only after its own dependency refresh is reviewed, merged and validated against these legacy protocols; package upgrades here do not select an arbitrary provider head.
 
 `pip-audit --local` audits known vulnerabilities in the installed environment. Local source or Git dependencies may be skipped by the vulnerability database. Fixed commits, code review, and project tests remain part of their security boundary.
 
@@ -205,3 +205,5 @@ Keep the legacy extra until callers and unsupported scenarios have migrated.
 Runtime continues to own process supervision, SQLite state and result publication
 verification through its engine protocol. It does not use the provider SDK as a
 subprocess supervisor.
+
+Go v8 [financial checkpoint sessions](financial-sessions.md) use the same locked provider. Run `tests/test_go_financial_sessions.py` with the race-built Go executable; all four actual SIGKILL boundaries are required. This provider upgrade retains immutable v1–v4 golden fixtures and all v1–v7 regression gates.

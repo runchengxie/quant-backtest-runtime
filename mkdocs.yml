@@ -64,6 +64,7 @@ nav:
       - Verified partition inputs: partition-inputs-v1.md
       - Session process channel: session-stream.md
       - Queued partition sessions: queued-sessions.md
+      - Financial checkpoint sessions: financial-sessions.md
   - 简体中文:
       - 首页: index.zh-CN.md
       - 回测任务与结果: jobs.zh-CN.md
@@ -75,3 +76,4 @@ nav:
       - 已验证的分区输入: partition-inputs-v1.zh-CN.md
       - 会话进程通道: session-stream.zh-CN.md
       - 分区会话队列: queued-sessions.zh-CN.md
+      - 财务检查点会话: financial-sessions.zh-CN.md

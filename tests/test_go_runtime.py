@@ -115,6 +115,7 @@ def test_go_discovery_preserves_shared_operation_contract(runtime: Runtime) -> N
         "source_revision",
         "resource_limits",
         "queued_session",
+        "financial_session",
     ):
         del found[key]
     found["operations"] = [row for row in found["operations"] if row["id"] != "serve"]

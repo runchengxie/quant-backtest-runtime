@@ -110,17 +110,23 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 	if version.SchemaVersion == 7 {
 		module = "backtest_runtime.queued_session_adapter"
 	}
-	args := []string{"-m", module, operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
-	if o.EngineExecutable != "" {
+	if version.SchemaVersion == 8 {
+		module = "backtest_runtime.financial_session_adapter"
+	}
+	args := []string{"-B", "-m", module, operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
+	if o.EngineExecutable != "" && version.SchemaVersion != 8 {
 		args = append(args, "--engine-executable", o.EngineExecutable)
 	}
 	if version.SchemaVersion == 7 {
 		args = append(args, "--partition-root", o.PartitionRoot)
 	}
+	if version.SchemaVersion == 8 {
+		args = append(args, "--runtime-source", SourceRevision)
+	}
 	args = append(args, extra...)
 	timeout := time.Minute
 	memory := 0
-	if operation == "stage" || version.SchemaVersion == 7 {
+	if operation == "stage" || version.SchemaVersion >= 7 {
 		var parsed struct {
 			Budgets protocol.Budgets `json:"budgets"`
 		}
@@ -132,6 +138,9 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 		if operation == "plan" {
 			timeout = 10 * time.Second
 			memory = 256
+			if version.SchemaVersion == 8 {
+				memory = 2048
+			}
 		}
 	}
 	output, e := supervisor.Run(ctx, supervisor.Config{Executable: o.PythonExecutable, SHA256: hash(binary), Args: args, MemoryMB: memory, Timeout: timeout, StdoutLimit: 1 << 20, StderrLimit: 8192})
@@ -169,7 +178,7 @@ func loadRequest(ctx context.Context, o Options, path string) (*protocol.Request
 	if e = json.Unmarshal(b, &marker); e != nil {
 		return nil, failure("INVALID_REQUEST", e.Error())
 	}
-	if marker.SchemaVersion >= 5 && marker.SchemaVersion <= 7 {
+	if marker.SchemaVersion >= 5 && marker.SchemaVersion <= 8 {
 		r, e := protocol.Decode(b)
 		if e != nil {
 			return nil, failure("INVALID_REQUEST", e.Error())
@@ -195,6 +204,9 @@ func loadRequest(ctx context.Context, o Options, path string) (*protocol.Request
 }
 
 func buildPlan(ctx context.Context, o Options, r *protocol.Request) (map[string]any, error) {
+	if r.SchemaVersion == 8 {
+		return financialPlan(ctx, o, r)
+	}
 	if r.SchemaVersion == 7 {
 		if !filepath.IsAbs(o.PartitionRoot) || !filepath.IsAbs(o.EngineExecutable) {
 			return nil, failure("INVALID_REQUEST", "v7 requires absolute operator partition-root and engine-executable")

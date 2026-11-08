@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-legacy = ["quant-platform @ git+https://github.com/runchengxie/quant-platform.git@15ec62b66e894395d694049eaaace931de4a1265"]
+legacy = ["quant-platform @ git+https://github.com/runchengxie/quant-platform.git@7a618bddd8fdeee5dbe37fe5b54a9698e0de5355"]
 
 [project.scripts]
 backtest-job = "backtest_runtime.cli:main"

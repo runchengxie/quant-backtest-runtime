@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -208,6 +210,14 @@ func worker(parent context.Context, o Options) error {
 			_, e = buildPlan(ctx, o, r)
 		}
 	}
+	if e == nil && r.SchemaVersion == 8 {
+		var token [16]byte
+		_, e = rand.Read(token[:])
+		if e == nil {
+			o.attemptToken = hex.EncodeToString(token[:])
+			e = st.BeginAttempt(job.JobID, o.attemptToken)
+		}
+	}
 	if e == nil {
 		stage, digest, e = execute(ctx, o, job.JobID, r)
 	}
@@ -267,7 +277,11 @@ func publishResult(ctx context.Context, o Options, st *store.Store, id, stage, d
 	if e == nil {
 		attempted = true
 		var completed bool
-		completed, e = st.FinishContext(ctx, id, "SUCCEEDED", "backtest-job://"+id, digest, "", "")
+		if o.attemptToken != "" {
+			completed, e = st.FinishAttempt(ctx, id, o.attemptToken, "backtest-job://"+id, digest)
+		} else {
+			completed, e = st.FinishContext(ctx, id, "SUCCEEDED", "backtest-job://"+id, digest, "", "")
+		}
 		if completed && e == nil {
 			return nil
 		}
@@ -334,6 +348,9 @@ func workerFailureCode(err error) string {
 func execute(ctx context.Context, o Options, id string, r *protocol.Request) (string, string, error) {
 	if e := os.MkdirAll(o.ResultRoot, 0700); e != nil {
 		return "", "", e
+	}
+	if r.SchemaVersion == 8 {
+		return executeFinancialSession(ctx, o, id, r)
 	}
 	if r.SchemaVersion == 7 {
 		return executeQueuedSessions(ctx, o, id, r)
@@ -462,6 +479,9 @@ func readResult(ctx context.Context, o Options, j store.Job) (map[string]any, er
 	r, e := requestForJob(ctx, o, j)
 	if e != nil {
 		return nil, e
+	}
+	if r.SchemaVersion == 8 {
+		return readFinancialSession(ctx, o, j, r)
 	}
 	if r.SchemaVersion == 7 {
 		return readQueuedSessions(ctx, o, j, r)

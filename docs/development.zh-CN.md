@@ -44,7 +44,7 @@ v1 至 v4 的协议固定摘要测试使用 `tests/fixtures/legacy-golden` 中�
 
 ## 依赖审计边界
 
-legacy 可选依赖保留已审阅的兼容基线 quant-platform `15ec62b66e894395d694049eaaace931de4a1265`。该提供方完成自身依赖升级、审阅、合并，并通过旧协议联合验证后，再升级此固定版本；本次包升级不随意选择提供方的新提交。
+legacy 可选依赖保留已审阅的兼容基线 quant-platform `7a618bddd8fdeee5dbe37fe5b54a9698e0de5355`。该提供方完成自身依赖升级、审阅、合并，并通过旧协议联合验证后，再升级此固定版本；本次包升级不随意选择提供方的新提交。
 
 `pip-audit --local` 审计已安装环境中的已知漏洞，发现漏洞会使 CI 失败。`quant-backtest-runtime`、`quant-platform` 和 `research-contracts` 通过本地源码或 Git 安装，目前没有可供 PyPI 漏洞数据库匹配的发行记录，工具会列出跳过原因。这些包需要结合固定提交、代码审查和各自测试维护，安全审计通过不代表它们已经完成漏洞扫描。
 
@@ -151,3 +151,5 @@ v6 计划仍将引擎语义标为 `not_checked`，v5 使用引擎提供的静态
 此次改动只拆分安装依赖，没有将 Python 算法迁入 Rust。在调用方和暂不支持的场景
 完成迁移前，请保留 legacy 扩展。runtime 继续通过自身引擎协议负责进程监管、
 SQLite 状态和结果发布校验，不使用提供方 SDK 监管子进程。
+
+Go v8 [财务检查点会话](financial-sessions.zh-CN.md) 使用同一锁定提供者。以启用 race 检测的 Go 可执行文件运行 `tests/test_go_financial_sessions.py`，四个真实 SIGKILL 边界均须通过。本次提供者升级保留 v1–v4 不可变基准文件及全部 v1–v7 回归检查。

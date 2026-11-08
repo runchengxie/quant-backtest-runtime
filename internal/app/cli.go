@@ -27,6 +27,7 @@ import (
 type Options struct {
 	Database, ArtifactRoot, ResultRoot, EngineExecutable, PythonExecutable string
 	PartitionRoot                                                          string
+	FinancialFault, attemptToken                                           string
 	Command, Argument, Key, ExpectedPlan                                   string
 	JSONErrors, Queue, Once                                                bool
 	Concurrency                                                            int
@@ -46,7 +47,7 @@ var capabilityBytes []byte
 
 func parse(args []string) (Options, error) {
 	o := Options{Concurrency: 1}
-	values := map[string]*string{"--partition-root": &o.PartitionRoot, "--database": &o.Database, "--artifact-root": &o.ArtifactRoot, "--result-root": &o.ResultRoot, "--engine-executable": &o.EngineExecutable, "--python-executable": &o.PythonExecutable, "--idempotency-key": &o.Key, "--expected-plan-sha256": &o.ExpectedPlan, "--cgroup-root": &o.CgroupRoot}
+	values := map[string]*string{"--financial-fault": &o.FinancialFault, "--partition-root": &o.PartitionRoot, "--database": &o.Database, "--artifact-root": &o.ArtifactRoot, "--result-root": &o.ResultRoot, "--engine-executable": &o.EngineExecutable, "--python-executable": &o.PythonExecutable, "--idempotency-key": &o.Key, "--expected-plan-sha256": &o.ExpectedPlan, "--cgroup-root": &o.CgroupRoot}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		v := ""
@@ -105,6 +106,9 @@ func parse(args []string) (Options, error) {
 				return o, failure("INVALID_ARGUMENTS", "unexpected argument")
 			}
 		}
+	}
+	if o.FinancialFault != "" && (o.Command != "__worker" || !financialFaultPattern.MatchString(o.FinancialFault)) {
+		return o, failure("INVALID_ARGUMENTS", "financial-fault requires a bounded __worker diagnostic phase:cursor")
 	}
 	if o.CgroupRoot != "" && o.Command != "serve" {
 		return o, failure("INVALID_ARGUMENTS", "cgroup-root is available only for the queue scheduler")
@@ -203,6 +207,7 @@ func dispatch(ctx context.Context, o Options) (any, error) {
 			return nil, e
 		}
 		m["queued_session"] = map[string]any{"request_version": 7, "backend": "nautilus.partition_session_replay", "operator_root_option": "--partition-root", "recovery": "terminal_lease_expiry"}
+		m["financial_session"] = map[string]any{"request_version": 8, "backend": "platform.minute_session_resume", "policy": "target-weights.v1", "checkpoint_format": "minute-session.v2", "recovery": "explicit_failed_predecessor"}
 		m["implementation"] = "go"
 		m["source_revision"] = SourceRevision
 		m["resource_limits"] = map[string]any{"memory_mb_scope": "backend_child_address_space", "go_orchestration_memory_included": false, "whole_job_memory_parity": "not_established", "queue_concurrency_scope": "scheduler_managed_jobs"}
