@@ -61,7 +61,7 @@ func HandleExec(args []string) bool {
 	return true
 }
 func minimalEnv() []string {
-	env := []string{"PATH=/usr/bin:/bin", "LANG=C.UTF-8", "LC_ALL=C.UTF-8"}
+	env := []string{"PATH=/usr/bin:/bin", "LANG=C.UTF-8", "LC_ALL=C.UTF-8", "PYTHONDONTWRITEBYTECODE=1"}
 	for _, k := range []string{"TMPDIR", "LD_LIBRARY_PATH"} {
 		if v, ok := os.LookupEnv(k); ok {
 			env = append(env, k+"="+v)

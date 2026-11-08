@@ -113,7 +113,7 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 	if version.SchemaVersion == 8 {
 		module = "backtest_runtime.financial_session_adapter"
 	}
-	args := []string{"-B", "-m", module, operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
+	args := []string{"-m", module, operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
 	if o.EngineExecutable != "" && version.SchemaVersion != 8 {
 		args = append(args, "--engine-executable", o.EngineExecutable)
 	}
