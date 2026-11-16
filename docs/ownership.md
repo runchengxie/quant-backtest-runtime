@@ -10,7 +10,8 @@ After the runtime was split from the research repository, generic task-operation
 | Generic CLI examples, synthetic checks, release, and rollback | This repository's `scripts/`, `examples/`, and `docs/` |
 | Strategy inputs, research clients, provenance, and promotion | `quant-research` |
 | Read-only adapters for legacy research jobs | `quant-research` |
-| Backtest algorithms, execution simulation, and standard result packages | `quant-platform` |
+| Legacy backtest algorithms, execution simulation, and results | `quant-platform` |
+| Engine product financial sessions and normalized ledgers | `quant-backtest-engine` |
 
 The research-side `scripts/dev/check_legacy_backtest_jobs.py` checks whether the legacy `ExperimentRegistry` still has unfinished jobs. It remains in the research repository while the historical adapter is in use.
 
@@ -35,3 +36,8 @@ with Research. A coordinator workflow or completed Runtime job cannot grant thos
 permissions. The [public demo](https://runchengxie.github.io/quant-task-orchestrator/)
 uses synthetic browser-local fixtures. Register real work only after isolated
 owner acceptance; this integration does not migrate production timers or services.
+
+Go v9 uses the Engine's public financial-session API through a fixed staging-only
+adapter. Engine owns all financial calculations; Runtime owns durable admission and
+publication. v8 keeps its existing Platform owner. See
+[Engine sessions](engine-financial-sessions.md) and [legacy recovery](legacy-recovery.md).

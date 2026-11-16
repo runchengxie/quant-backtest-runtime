@@ -94,3 +94,6 @@ Go 在认领任务后生成随机所有权令牌。固定 Python 子进程每次
 `tests/test_financial_sessions.py` 验证每个原生事件边界，并独立计算本地跨午夜分红送股、
 估值与资金流期望值。设置 `BACKTEST_GO_EXECUTABLE` 并使用锁定环境运行。
 既有引擎和队列会话测试仍是兼容性必检项。参见[开发文档](development.zh-CN.md)。
+
+本 v8 协议保持不变。新增 Engine 任务使用独立的 [v9 接口](engine-financial-sessions.zh-CN.md)、
+环境与任务库；旧 checkpoint 必须使用 [原始完整恢复环境](legacy-recovery.zh-CN.md)。

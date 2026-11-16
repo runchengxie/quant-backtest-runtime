@@ -153,3 +153,22 @@ v6 计划仍将引擎语义标为 `not_checked`，v5 使用引擎提供的静态
 SQLite 状态和结果发布校验，不使用提供方 SDK 监管子进程。
 
 Go v8 [财务检查点会话](financial-sessions.zh-CN.md) 使用同一锁定提供者。以启用 race 检测的 Go 可执行文件运行 `tests/test_go_financial_sessions.py`，四个真实 SIGKILL 边界均须通过。本次提供者升级保留 v1–v4 不可变基准文件及全部 v1–v7 回归检查。
+
+## Engine provider 验证（v9）
+
+使用独立的 `uv sync --locked --extra engine --group dev` 环境，不能合并 engine 与
+legacy extra；上述旧协议验证仍在原来的固定 legacy 环境运行。外部构建带 race 检测的
+Go CLI，然后设置 `BACKTEST_GO_EXECUTABLE` 为新二进制，
+`BACKTEST_LEGACY_GO_EXECUTABLE` 为保留的旧 v8 二进制，运行：
+
+```sh
+uv run --locked --extra engine pytest -q tests/test_engine_financial_sessions.py tests/test_go_engine_financial_sessions.py
+```
+
+Engine 环境中的进程验证缺少二进制时直接失败；固定 provider 与旧 worker 均为必需。
+四个真实 SIGKILL 用例必须执行，不能将跳过算作通过。两个环境都须保留完整外部来源和
+命令清单。参见 [Engine 会话](engine-financial-sessions.zh-CN.md) 和
+[旧版本恢复](legacy-recovery.zh-CN.md)。
+
+缺少 provider 的检查还需设置 `BACKTEST_ENGINE_MINIMAL_PYTHON`，指向仅安装基础 Runtime
+的解释器。legacy 验证环境不能安装 Engine 包。

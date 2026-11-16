@@ -65,6 +65,8 @@ nav:
       - Session process channel: session-stream.md
       - Queued partition sessions: queued-sessions.md
       - Financial checkpoint sessions: financial-sessions.md
+      - Engine financial sessions: engine-financial-sessions.md
+      - Legacy recovery closures: legacy-recovery.md
   - 简体中文:
       - 首页: index.zh-CN.md
       - 回测任务与结果: jobs.zh-CN.md
@@ -77,3 +79,5 @@ nav:
       - 会话进程通道: session-stream.zh-CN.md
       - 分区会话队列: queued-sessions.zh-CN.md
       - 财务检查点会话: financial-sessions.zh-CN.md
+      - Engine 财务会话: engine-financial-sessions.zh-CN.md
+      - 旧版本恢复环境: legacy-recovery.zh-CN.md

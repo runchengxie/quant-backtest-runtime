@@ -207,6 +207,7 @@ func dispatch(ctx context.Context, o Options) (any, error) {
 			return nil, e
 		}
 		m["queued_session"] = map[string]any{"request_version": 7, "backend": "nautilus.partition_session_replay", "operator_root_option": "--partition-root", "recovery": "terminal_lease_expiry"}
+		m["engine_financial_session"] = map[string]any{"request_version": 9, "backend": "engine.minute_session_resume", "checkpoint_format": "engine-financial-checkpoint.v1", "binding_schema": "runtime-engine-binding.v1", "queue_isolation": "dedicated_database_and_worker"}
 		m["financial_session"] = map[string]any{"request_version": 8, "backend": "platform.minute_session_resume", "policy": "target-weights.v1", "checkpoint_format": "minute-session.v2", "recovery": "explicit_failed_predecessor"}
 		m["implementation"] = "go"
 		m["source_revision"] = SourceRevision

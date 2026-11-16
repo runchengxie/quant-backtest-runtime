@@ -1,0 +1,258 @@
+{
+  "schema": "backtest-product.v1",
+  "backend_id": "python.minute",
+  "required_capabilities": [
+    "checkpoint",
+    "corporate_actions",
+    "capital_flows"
+  ],
+  "model_versions": {},
+  "input_schema": "minute-input.v1",
+  "inputs": {},
+  "inline_inputs": {
+    "targets": [
+      {
+        "decision_time": "1767576540000000000",
+        "entry_time": "1767576600000000000",
+        "symbol": "A",
+        "weight": "1.0"
+      },
+      {
+        "decision_time": "1767662940000000000",
+        "entry_time": "1767663000000000000",
+        "symbol": "A",
+        "weight": "0.0"
+      },
+      {
+        "decision_time": "1767749340000000000",
+        "entry_time": "1767749400000000000",
+        "symbol": "A",
+        "weight": "0.0"
+      }
+    ],
+    "bars": [
+      {
+        "time": "1767576540000000000",
+        "interval_start": "1767576510000000000",
+        "symbol": "A",
+        "open": "10.0",
+        "high": "10.0",
+        "low": "10.0",
+        "close": "10.0",
+        "volume": "1000",
+        "amount": "10000.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767576720000000000",
+        "interval_start": "1767576690000000000",
+        "symbol": "A",
+        "open": "10.0",
+        "high": "10.0",
+        "low": "10.0",
+        "close": "10.0",
+        "volume": "1000",
+        "amount": "10000.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767576780000000000",
+        "interval_start": "1767576750000000000",
+        "symbol": "A",
+        "open": "10.0",
+        "high": "10.0",
+        "low": "10.0",
+        "close": "10.0",
+        "volume": "1000",
+        "amount": "10000.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767662940000000000",
+        "interval_start": "1767662910000000000",
+        "symbol": "A",
+        "open": "4.5",
+        "high": "4.5",
+        "low": "4.5",
+        "close": "4.5",
+        "volume": "1000",
+        "amount": "4500.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767663120000000000",
+        "interval_start": "1767663090000000000",
+        "symbol": "A",
+        "open": "4.5",
+        "high": "4.5",
+        "low": "4.5",
+        "close": "4.5",
+        "volume": "1000",
+        "amount": "4500.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767663180000000000",
+        "interval_start": "1767663150000000000",
+        "symbol": "A",
+        "open": "4.5",
+        "high": "4.5",
+        "low": "4.5",
+        "close": "4.5",
+        "volume": "1000",
+        "amount": "4500.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767749340000000000",
+        "interval_start": "1767749310000000000",
+        "symbol": "A",
+        "open": "4.5",
+        "high": "4.5",
+        "low": "4.5",
+        "close": "4.5",
+        "volume": "1000",
+        "amount": "4500.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767749520000000000",
+        "interval_start": "1767749490000000000",
+        "symbol": "A",
+        "open": "4.5",
+        "high": "4.5",
+        "low": "4.5",
+        "close": "4.5",
+        "volume": "1000",
+        "amount": "4500.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      },
+      {
+        "time": "1767749580000000000",
+        "interval_start": "1767749550000000000",
+        "symbol": "A",
+        "open": "4.5",
+        "high": "4.5",
+        "low": "4.5",
+        "close": "4.5",
+        "volume": "1000",
+        "amount": "4500.0",
+        "up_limit": "11.0",
+        "down_limit": "1.0",
+        "tradable": true
+      }
+    ]
+  },
+  "currency": "CNY",
+  "share_basis": "raw",
+  "calendar": {
+    "uri": "minute-calendar.json",
+    "sha256": "a17037858ee963f137ff28a35b962a3a467d7f09f36a4be1f9ca2d197aacefa6",
+    "media_type": "application/json"
+  },
+  "timezone": "Asia/Shanghai",
+  "units": {
+    "cash": "CNY"
+  },
+  "clocks": {
+    "available_ns": "1767576540000000000",
+    "information_ns": null,
+    "decision_ns": null,
+    "entry_ns": null,
+    "effective_ns": null,
+    "report_ns": null,
+    "valuation_ns": null
+  },
+  "initial_account": {
+    "cash": "10000"
+  },
+  "settings": {
+    "config": {
+      "participation_rate": "0.1",
+      "buy_fee_bp": "3",
+      "sell_fee_bp": "8",
+      "lot_size": 100,
+      "release_slices": 1,
+      "execution_minutes": 30,
+      "latency_minutes": 1,
+      "commission_minimum_cny": "5",
+      "sell_tax_bp": "5"
+    },
+    "report_delay_seconds": "600",
+    "impact": {
+      "transient": "0",
+      "permanent": "0.0001",
+      "decay_seconds": "60"
+    }
+  },
+  "tapes": {
+    "corporate_actions": [
+      {
+        "event_id": "distribution",
+        "symbol": "A",
+        "available_date": "2026-01-04",
+        "record_date": "2026-01-05",
+        "ex_date": "2026-01-06",
+        "cash_per_share": "1.0",
+        "cash_pay_date": "2026-01-07",
+        "stock_per_share": "1.0",
+        "stock_tradable_date": "2026-01-07",
+        "withholding_rate": "0.0"
+      }
+    ],
+    "valuation_events": [],
+    "capital_flows": [
+      {
+        "event_id": "deposit",
+        "available_time": "1767576540000000000",
+        "effective_time": "1767576780000000000",
+        "amount": "100.0",
+        "source": "synthetic"
+      },
+      {
+        "event_id": "withdrawal",
+        "available_time": "1767749340000000000",
+        "effective_time": "1767749400000000000",
+        "amount": "-50.0",
+        "source": "synthetic"
+      }
+    ],
+    "quantity_locks": [
+      {
+        "available_ns": "1767628800000000000",
+        "start_ns": "1767628800000000000",
+        "end_ns": "1767749400000000000",
+        "symbols": [
+          "A"
+        ],
+        "source_binding": "synthetic-lock"
+      }
+    ]
+  },
+  "policy": {
+    "id": "target-weights",
+    "version": "v1",
+    "state_schema": "target-weights-state.v1",
+    "config": {}
+  },
+  "forecast": null,
+  "risk": null,
+  "scenario": null,
+  "output_uri": "minute-result.json"
+}
