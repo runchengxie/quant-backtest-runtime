@@ -71,6 +71,12 @@ func resolveArtifact(root, ref string) (string, error) {
 }
 func legacyCall(ctx context.Context, o Options, operation string, request []byte, extra ...string) (map[string]any, error) {
 	if o.PythonExecutable == "" || !filepath.IsAbs(o.PythonExecutable) {
+		var marker struct {
+			SchemaVersion int `json:"schema_version"`
+		}
+		if json.Unmarshal(request, &marker) == nil && marker.SchemaVersion == 9 {
+			return nil, failure("ENGINE_DEPENDENCY_UNAVAILABLE", "configure --python-executable with the locked Runtime engine environment")
+		}
 		return nil, failure("LEGACY_DEPENDENCY_UNAVAILABLE", "configure --python-executable with an installed quant-backtest-runtime environment (legacy extra for v1-v4)")
 	}
 	file, e := os.OpenFile(o.PythonExecutable, os.O_RDONLY|syscall.O_NONBLOCK, 0)
@@ -110,18 +116,33 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 	if version.SchemaVersion == 7 {
 		module = "backtest_runtime.queued_session_adapter"
 	}
+	if version.SchemaVersion == 9 {
+		module = "backtest_runtime.engine_financial_adapter"
+	}
 	if version.SchemaVersion == 8 {
 		module = "backtest_runtime.financial_session_adapter"
 	}
 	args := []string{"-m", module, operation, "--request", name, "--artifact-root", o.ArtifactRoot, "--result-root", o.ResultRoot}
-	if o.EngineExecutable != "" && version.SchemaVersion != 8 {
+	if version.SchemaVersion == 9 {
+		cache, err := os.MkdirTemp("", "runtime-engine-pycache-")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(cache)
+		// -B alone still reads existing caches. A fresh prefix forces audited .py.
+		args = append([]string{"-B", "-X", "pycache_prefix=" + cache}, args...)
+	}
+	if o.EngineExecutable != "" && version.SchemaVersion < 8 {
 		args = append(args, "--engine-executable", o.EngineExecutable)
 	}
 	if version.SchemaVersion == 7 {
 		args = append(args, "--partition-root", o.PartitionRoot)
 	}
-	if version.SchemaVersion == 8 {
+	if version.SchemaVersion >= 8 {
 		args = append(args, "--runtime-source", SourceRevision)
+	}
+	if version.SchemaVersion == 9 {
+		args = append(args, "--runtime-binary", fmt.Sprintf("/proc/%d/exe", os.Getpid()))
 	}
 	args = append(args, extra...)
 	timeout := time.Minute
@@ -138,7 +159,7 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 		if operation == "plan" {
 			timeout = 10 * time.Second
 			memory = 256
-			if version.SchemaVersion == 8 {
+			if version.SchemaVersion >= 8 {
 				memory = 2048
 			}
 		}
@@ -152,6 +173,9 @@ func legacyCall(ctx context.Context, o Options, operation string, request []byte
 			}
 		}
 		code := "LEGACY_DEPENDENCY_UNAVAILABLE"
+		if version.SchemaVersion == 9 {
+			code = "ENGINE_DEPENDENCY_UNAVAILABLE"
+		}
 		if version.SchemaVersion == 7 {
 			code = "BACKEND_EXECUTION_FAILED"
 		}
@@ -178,7 +202,7 @@ func loadRequest(ctx context.Context, o Options, path string) (*protocol.Request
 	if e = json.Unmarshal(b, &marker); e != nil {
 		return nil, failure("INVALID_REQUEST", e.Error())
 	}
-	if marker.SchemaVersion >= 5 && marker.SchemaVersion <= 8 {
+	if marker.SchemaVersion >= 5 && marker.SchemaVersion <= 9 {
 		r, e := protocol.Decode(b)
 		if e != nil {
 			return nil, failure("INVALID_REQUEST", e.Error())
@@ -204,6 +228,9 @@ func loadRequest(ctx context.Context, o Options, path string) (*protocol.Request
 }
 
 func buildPlan(ctx context.Context, o Options, r *protocol.Request) (map[string]any, error) {
+	if r.SchemaVersion == 9 {
+		return engineFinancialPlan(ctx, o, r)
+	}
 	if r.SchemaVersion == 8 {
 		return financialPlan(ctx, o, r)
 	}

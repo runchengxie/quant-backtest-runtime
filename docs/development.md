@@ -207,3 +207,24 @@ verification through its engine protocol. It does not use the provider SDK as a
 subprocess supervisor.
 
 Go v8 [financial checkpoint sessions](financial-sessions.md) use the same locked provider. Run `tests/test_go_financial_sessions.py` with the race-built Go executable; all four actual SIGKILL boundaries are required. This provider upgrade retains immutable v1–v4 golden fixtures and all v1–v7 regression gates.
+
+## Engine provider gate (v9)
+
+Use a separate `uv sync --locked --extra engine --group dev` environment. Engine and
+legacy extras cannot be combined. Run the legacy gates above in their own environment.
+For v9, build the race-enabled Go CLI externally and run:
+
+```sh
+BACKTEST_GO_EXECUTABLE=/absolute/path/to/new/backtest-job \
+BACKTEST_LEGACY_GO_EXECUTABLE=/absolute/path/to/retained/v8/backtest-job \
+uv run --locked --extra engine pytest -q tests/test_engine_financial_sessions.py tests/test_go_engine_financial_sessions.py
+```
+
+The Engine-only process gate fails when its executable is absent; its installed
+provider and retained old worker are mandatory. Four real SIGKILL cases must execute,
+not skip. Retain complete external closure/command receipts for both environments.
+See [Engine sessions](engine-financial-sessions.md) and
+[legacy recovery](legacy-recovery.md).
+
+For the missing-provider check also set `BACKTEST_ENGINE_MINIMAL_PYTHON` to a base-only
+Runtime installation's interpreter. The legacy gate must not install Engine packages.

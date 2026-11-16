@@ -113,3 +113,7 @@ at all four boundaries; `tests/test_financial_sessions.py` compares every owner 
 and includes independent local-midnight split/valuation/capital expectations. Run with
 `BACKTEST_GO_EXECUTABLE` and the installed locked environment. Existing engine/queued
 session tests remain required compatibility checks. See [development](development.md).
+
+This v8 contract remains unchanged. New Engine-owned jobs use the separate
+[v9 interface](engine-financial-sessions.md), environment and task store; old
+checkpoints require the [original recovery closure](legacy-recovery.md).

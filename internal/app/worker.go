@@ -210,7 +210,7 @@ func worker(parent context.Context, o Options) error {
 			_, e = buildPlan(ctx, o, r)
 		}
 	}
-	if e == nil && r.SchemaVersion == 8 {
+	if e == nil && r.SchemaVersion >= 8 {
 		var token [16]byte
 		_, e = rand.Read(token[:])
 		if e == nil {
@@ -258,6 +258,7 @@ func publishResult(ctx context.Context, o Options, st *store.Store, id, stage, d
 		return failure("PUBLICATION_FAILED", "final directory already exists")
 	}
 	attempted := false
+	tokenRejected := false
 	e := ctx.Err()
 	if e == nil {
 		e = syncFiles(stage)
@@ -279,6 +280,7 @@ func publishResult(ctx context.Context, o Options, st *store.Store, id, stage, d
 		var completed bool
 		if o.attemptToken != "" {
 			completed, e = st.FinishAttempt(ctx, id, o.attemptToken, "backtest-job://"+id, digest)
+			tokenRejected = e == nil && !completed
 		} else {
 			completed, e = st.FinishContext(ctx, id, "SUCCEEDED", "backtest-job://"+id, digest, "", "")
 		}
@@ -290,6 +292,12 @@ func publishResult(ctx context.Context, o Options, st *store.Store, id, stage, d
 	if readErr != nil {
 		// The commit outcome is unknown; recovery must decide whether files are live.
 		return errors.Join(e, readErr)
+	}
+	if tokenRejected && current.Status != "SUCCEEDED" && current.CancelRequestedAt == nil {
+		_ = os.RemoveAll(stage)
+		_ = os.RemoveAll(final)
+		_ = syncDir(o.ResultRoot)
+		return failure("INTEGRITY_FAILURE", "publication attempt no longer owns job")
 	}
 	if current.Status == "SUCCEEDED" {
 		return nil
@@ -348,6 +356,9 @@ func workerFailureCode(err error) string {
 func execute(ctx context.Context, o Options, id string, r *protocol.Request) (string, string, error) {
 	if e := os.MkdirAll(o.ResultRoot, 0700); e != nil {
 		return "", "", e
+	}
+	if r.SchemaVersion == 9 {
+		return executeEngineFinancialSession(ctx, o, id, r)
 	}
 	if r.SchemaVersion == 8 {
 		return executeFinancialSession(ctx, o, id, r)
@@ -479,6 +490,9 @@ func readResult(ctx context.Context, o Options, j store.Job) (map[string]any, er
 	r, e := requestForJob(ctx, o, j)
 	if e != nil {
 		return nil, e
+	}
+	if r.SchemaVersion == 9 {
+		return readEngineFinancialSession(ctx, o, j, r)
 	}
 	if r.SchemaVersion == 8 {
 		return readFinancialSession(ctx, o, j, r)

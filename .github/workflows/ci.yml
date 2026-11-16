@@ -171,3 +171,36 @@ jobs:
       - name: Minimal wheel discovery, read-only preflight and real v6 publication
         run: |
           "$RUNNER_TEMP/runtime-core/bin/python" scripts/smoke_core.py --engine-executable "$GITHUB_WORKSPACE/.engine-source/target/debug/quant-backtest-engine"
+
+  engine-financial:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: "1.27.3"
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+      - name: Build retained legacy Runtime from its exact source
+        run: |
+          git archive 01ed4c34f955ef6cd39d13aa073b6d61b610d321 | tar -x -C "$RUNNER_TEMP" --one-top-level=legacy-runtime
+          cd "$RUNNER_TEMP/legacy-runtime"
+          go build -race -o "$RUNNER_TEMP/legacy-backtest-job" ./cmd/backtest-job
+      - name: Install separate Engine closure and build current CLI
+        run: |
+          uv sync --locked --extra engine --group dev --python 3.13
+          uv venv --python 3.13 "$RUNNER_TEMP/runtime-base"
+          uv pip install --no-deps --python "$RUNNER_TEMP/runtime-base/bin/python" .
+          go build -race -ldflags "-X github.com/runchengxie/quant-backtest-runtime/internal/app.SourceRevision=$GITHUB_SHA" -o "$RUNNER_TEMP/engine-backtest-job" ./cmd/backtest-job
+      - name: Required real-process Engine recovery gate
+        env:
+          BACKTEST_GO_EXECUTABLE: ${{ runner.temp }}/engine-backtest-job
+          BACKTEST_ENGINE_MINIMAL_PYTHON: ${{ runner.temp }}/runtime-base/bin/python
+          BACKTEST_LEGACY_GO_EXECUTABLE: ${{ runner.temp }}/legacy-backtest-job
+        run: |
+          test -x "$BACKTEST_GO_EXECUTABLE"
+          test -x "$BACKTEST_LEGACY_GO_EXECUTABLE"
+          uv run --locked --extra engine python -c 'import quant_backtest_core.sessions'
+          uv run --locked --extra engine pytest -q tests/test_engine_financial_sessions.py tests/test_go_engine_financial_sessions.py

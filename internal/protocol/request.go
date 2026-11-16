@@ -258,8 +258,8 @@ func Decode(b []byte) (*Request, error) {
 		return nil, e
 	}
 	v, e := int64Value(m["schema_version"])
-	if e != nil || v < 5 || v > 8 {
-		return nil, fail("native requests require schema_version 5, 6, 7 or 8; legacy requests require the stateless adapter")
+	if e != nil || v < 5 || v > 9 {
+		return nil, fail("native requests require schema_version 5, 6, 7, 8 or 9; legacy requests require the stateless adapter")
 	}
 	keys := []string{"schema_version", "idempotency_key", "backend", "evidence_tier", "inputs", "config", "execution", "budgets"}
 	if _, ok := m["quant_run_manifest_ref"]; ok {
@@ -282,6 +282,9 @@ func Decode(b []byte) (*Request, error) {
 	if v == 7 {
 		backend = "nautilus.partition_session_replay"
 	}
+	if v == 9 {
+		backend = "engine.minute_session_resume"
+	}
 	if v == 8 {
 		backend = "platform.minute_session_resume"
 	}
@@ -295,6 +298,9 @@ func Decode(b []byte) (*Request, error) {
 	inputKeys := []string{"engine_request_ref"}
 	if v == 7 {
 		inputKeys = []string{"engine_config_ref", "partition_manifest_ref"}
+	}
+	if v == 9 {
+		inputKeys = []string{"product_manifest_ref"}
 	}
 	if v == 8 {
 		inputKeys = []string{"minute_input_ref"}
@@ -315,12 +321,16 @@ func Decode(b []byte) (*Request, error) {
 		return nil, e
 	}
 	s, ok := c["executable_sha256"].(string)
-	if v != 8 && (exact(c, "executable_sha256") != nil || !ok || !digestPattern.MatchString(s)) {
+	if v < 8 && (exact(c, "executable_sha256") != nil || !ok || !digestPattern.MatchString(s)) {
 		return nil, fail("invalid executable_sha256")
 	}
 	ex, e := object(m["execution"])
-	if v == 8 {
-		if exact(c, "provider_revision", "checkpoint_format", "policy") != nil || c["provider_revision"] != "7a618bddd8fdeee5dbe37fe5b54a9698e0de5355" || c["checkpoint_format"] != "minute-session.v2" || c["policy"] != "target-weights.v1" {
+	if v >= 8 {
+		if v == 9 {
+			if err := validateEngineFinancialConfig(c); err != nil {
+				return nil, err
+			}
+		} else if exact(c, "provider_revision", "checkpoint_format", "policy") != nil || c["provider_revision"] != "7a618bddd8fdeee5dbe37fe5b54a9698e0de5355" || c["checkpoint_format"] != "minute-session.v2" || c["policy"] != "target-weights.v1" {
 			return nil, fail("unsupported financial provider/format/policy")
 		}
 		if e != nil || len(ex) > 1 {
@@ -381,7 +391,7 @@ func importMapping(m map[string]any, raw, digest string) (*Request, error) {
 		return nil, fail("request exceeds 64 KiB")
 	}
 	v, e := int64Value(m["schema_version"])
-	if e != nil || v < 1 || v > 8 {
+	if e != nil || v < 1 || v > 9 {
 		return nil, fail("invalid schema_version")
 	}
 	k, ok := m["idempotency_key"].(string)

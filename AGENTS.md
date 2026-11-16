@@ -25,3 +25,8 @@ Go 生命周期实现位于 `cmd/backtest-job` 和 `internal/`。Python 兼容�
 - 切换前先执行 dry run 和合成数据 CLI 检查，保留可回滚版本。
 - 定时任务引用稳定的 `current` 路径，不引用开发 worktree。
 - 公开示例只使用合成数据，不复制私有研究参数、策略实现或真实数据。
+
+Go v9 固定调用 Engine 公共 financial sessions API，只允许适配器写暂存文件。
+`engine` 与 `legacy` extra 使用不同环境和数据库；旧 worker 不得访问 v9 队列。
+新 v9 进程门禁须执行全部四个真实 SIGKILL 边界，设置新 Go 和保留旧 Go 可执行文件，
+并在外部数据目录保存两套完整恢复来源清单。参见 docs/engine-financial-sessions.md。

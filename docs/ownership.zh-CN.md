@@ -10,7 +10,8 @@
 | 通用 CLI 示例、合成数据检查、发布和回滚 | 本仓库的 `scripts/`、`examples/` 和 `docs/` |
 | 策略输入准备、研究客户端、来源记录与晋升 | `quant-research` |
 | 旧研究任务库的只读适配与切换前检查 | `quant-research` |
-| 回测算法、执行模拟和标准结果包 | `quant-platform` |
+| 旧回测算法、执行模拟和结果 | `quant-platform` |
+| Engine 产品财务会话与标准账本 | `quant-backtest-engine` |
 
 研究侧的 `scripts/dev/check_legacy_backtest_jobs.py` 专门检查旧 `ExperimentRegistry` 是否还有未结束的任务，随历史适配保留在研究仓库。旧任务全部迁移或退役且无人使用 `--legacy` 后，可由研究仓库移除这一适配。
 
@@ -31,3 +32,7 @@
 研究准入、历史 PIT、经济结论与晋升仍归 Research。协调器工作流和已完成的回测任务均不能授予这些权限。
 [公开演示](https://runchengxie.github.io/quant-task-orchestrator/)仅使用浏览器内的合成数据。
 接入真实任务前须完成隔离的 Owner 验收；本次不迁移生产定时任务或服务。
+
+Go v9 通过固定、只写暂存的适配器调用 Engine 公共财务会话 API。Engine 负责全部财务
+计算，Runtime 负责持久化准入与发布；v8 仍使用原 Platform 所有者。参见
+[Engine 会话](engine-financial-sessions.zh-CN.md) 与 [旧版本恢复](legacy-recovery.zh-CN.md)。
