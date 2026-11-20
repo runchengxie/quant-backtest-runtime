@@ -3,7 +3,7 @@
 [English](engine-financial-sessions.md)
 
 新建 Engine 分钟任务使用 v9。Runtime 0.2.0 的 `engine` extra 将 core `[minute]`
-与 SDK 固定在已合并的 `ad0895f1c2015eb31bd364b40741b0f7cd6e0048`。
+与 SDK 固定在已合并的 `292a67aebe534769d9be7c9fea72bd94fc20c8f6`。
 `legacy` 仍固定 Platform `7a618bddd8fdeee5dbe37fe5b54a9698e0de5355`。
 两个 extra 必须安装在独立环境，避免 Engine 的 pandas 限制改变旧环境。
 
@@ -57,3 +57,5 @@ checkpoint 篡改和跨 provider 复用均拒绝恢复；必须使用原始完�
 即使环境中存在时间戳/大小均有效的旧字节码，也会执行源码；单独 `-B` 仍会读取缓存。
 固定 provider、Runtime 与依赖包中只有字节码、没有源码的模块会被拒绝。进程回归测试
 先证明普通 `-B` 会执行被改写但仍有效的缓存，再证明 Go 调用执行原始可审计源码。
+
+从绑定旧 Engine 的部署升级时，为这个版本使用单独的队列数据库、输入目录和结果目录。旧任务使用原来的 Runtime 与 Engine 安装恢复。

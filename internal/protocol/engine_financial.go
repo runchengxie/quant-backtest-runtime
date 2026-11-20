@@ -6,7 +6,7 @@ import (
 	"encoding/hex"
 )
 
-const EngineFinancialProvider = "ad0895f1c2015eb31bd364b40741b0f7cd6e0048"
+const EngineFinancialProvider = "292a67aebe534769d9be7c9fea72bd94fc20c8f6"
 
 func validateEngineFinancialConfig(c map[string]any) error {
 	if exact(c, "provider_revision", "checkpoint_format", "policy", "provider_binding_schema") != nil || c["provider_revision"] != EngineFinancialProvider || c["checkpoint_format"] != "engine-financial-checkpoint.v1" || c["policy"] != "target-weights.v1" || c["provider_binding_schema"] != "runtime-engine-binding.v1" {

@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-engine = ["quant-backtest-core[minute] @ git+https://github.com/runchengxie/quant-backtest-engine.git@ad0895f1c2015eb31bd364b40741b0f7cd6e0048#subdirectory=core", "quant-backtest-engine-client @ git+https://github.com/runchengxie/quant-backtest-engine.git@ad0895f1c2015eb31bd364b40741b0f7cd6e0048#subdirectory=python"]
+engine = ["quant-backtest-core[minute] @ git+https://github.com/runchengxie/quant-backtest-engine.git@292a67aebe534769d9be7c9fea72bd94fc20c8f6#subdirectory=packages/core", "quant-backtest-engine-client @ git+https://github.com/runchengxie/quant-backtest-engine.git@292a67aebe534769d9be7c9fea72bd94fc20c8f6#subdirectory=packages/python-sdk"]
 legacy = ["quant-platform @ git+https://github.com/runchengxie/quant-platform.git@7a618bddd8fdeee5dbe37fe5b54a9698e0de5355"]
 
 [project.scripts]
