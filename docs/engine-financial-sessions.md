@@ -4,7 +4,7 @@
 
 Use v9 for new Engine-owned minute jobs. Install Runtime 0.2.0 with the `engine`
 extra in a dedicated environment. Core `[minute]` and SDK are pinned to merged
-`ad0895f1c2015eb31bd364b40741b0f7cd6e0048`. The `legacy` extra retains Platform
+`292a67aebe534769d9be7c9fea72bd94fc20c8f6`. The `legacy` extra retains Platform
 `7a618bddd8fdeee5dbe37fe5b54a9698e0de5355`; the extras are mutually exclusive so
 Engine's pandas constraint cannot silently replace legacy's locked pandas.
 
@@ -26,7 +26,7 @@ The synthetic product manifest and calendar are under
   "evidence_tier": "diagnostic",
   "inputs": {"product_manifest_ref": "artifact://sha256/<manifest-digest>"},
   "config": {
-    "provider_revision": "ad0895f1c2015eb31bd364b40741b0f7cd6e0048",
+    "provider_revision": "292a67aebe534769d9be7c9fea72bd94fc20c8f6",
     "checkpoint_format": "engine-financial-checkpoint.v1",
     "policy": "target-weights.v1",
     "provider_binding_schema": "runtime-engine-binding.v1"
@@ -92,3 +92,5 @@ stale cache exists in the environment; `-B` alone would still read it. Runtime r
 bytecode-only modules in the fixed provider/runtime/dependency packages. The process
 regression first proves altered valid cached bytecode executes under ordinary `-B`,
 then proves Go executes the original audited adapter source instead.
+
+When deploying alongside an older Engine binding, use a separate queue database, input store and result store for this release. Resume existing jobs with their original Runtime and Engine installation.

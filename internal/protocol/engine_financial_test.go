@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const engineFinancialRequest = `{"schema_version":9,"idempotency_key":"synthetic-engine","backend":"engine.minute_session_resume","evidence_tier":"diagnostic","inputs":{"product_manifest_ref":"artifact://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"config":{"provider_revision":"ad0895f1c2015eb31bd364b40741b0f7cd6e0048","checkpoint_format":"engine-financial-checkpoint.v1","policy":"target-weights.v1","provider_binding_schema":"runtime-engine-binding.v1"},"execution":{},"budgets":{"wall_seconds":30,"memory_mb":4096}}`
+const engineFinancialRequest = `{"schema_version":9,"idempotency_key":"synthetic-engine","backend":"engine.minute_session_resume","evidence_tier":"diagnostic","inputs":{"product_manifest_ref":"artifact://sha256/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"config":{"provider_revision":"292a67aebe534769d9be7c9fea72bd94fc20c8f6","checkpoint_format":"engine-financial-checkpoint.v1","policy":"target-weights.v1","provider_binding_schema":"runtime-engine-binding.v1"},"execution":{},"budgets":{"wall_seconds":30,"memory_mb":4096}}`
 
 func TestEngineFinancialRequest(t *testing.T) {
 	r, err := Decode([]byte(engineFinancialRequest))

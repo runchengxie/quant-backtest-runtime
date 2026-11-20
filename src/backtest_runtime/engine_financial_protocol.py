@@ -15,8 +15,8 @@ from urllib.parse import unquote, urlsplit
 from .session_stream_io import canonical
 
 WHEELS = {
-    "quant-backtest-core": "57ed0dc2ede0bbc82dc6298965a5e56f05ffaba9308563f2509d5c2b50d89650",
-    "quant-backtest-engine-client": "bb5e3cd7322e2653729c17f856a1a1747f9b999275ce982a5374fd4e39ff616c",
+    "quant-backtest-core": "190194bbccde400d4240de5bd0007038e073315d266c84f4c0ddd139356ef3da",
+    "quant-backtest-engine-client": "46d9632a3ecc29900908fa8ec3bdcbbc92552de47d0339d3171cd5dfdbcaf726",
 }
 
 
@@ -46,7 +46,7 @@ def verify_provider(dist, direct, name):
                 )
 
 
-PROVIDER = "ad0895f1c2015eb31bd364b40741b0f7cd6e0048"
+PROVIDER = "292a67aebe534769d9be7c9fea72bd94fc20c8f6"
 
 
 def digest(raw):
@@ -98,7 +98,7 @@ def installed_identity(runtime_source, runtime_binary=None):
         )
     if (
         digest(canonical(sources) + b"\n")
-        != "dca6f1413d34696c418a14ebb452faf8381aa5038a70aed866d30b3eb1545aec"
+        != "328c0a658cc2c8dd2b90d5991005f4a210fd880ca16dc1dec04e2866dd5eaec9"
     ):
         raise ValueError(
             "installed Engine core/SDK sources differ from pinned provider"

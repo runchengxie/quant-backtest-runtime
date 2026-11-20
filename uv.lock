@@ -1245,7 +1245,7 @@ wheels = [
 [[package]]
 name = "quant-backtest-core"
 version = "0.3.0"
-source = { git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=core&rev=ad0895f1c2015eb31bd364b40741b0f7cd6e0048#ad0895f1c2015eb31bd364b40741b0f7cd6e0048" }
+source = { git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=packages%2Fcore&rev=292a67aebe534769d9be7c9fea72bd94fc20c8f6#292a67aebe534769d9be7c9fea72bd94fc20c8f6" }
 dependencies = [
     { name = "quant-backtest-engine-client" },
 ]
@@ -1258,7 +1258,7 @@ minute = [
 [[package]]
 name = "quant-backtest-engine-client"
 version = "0.3.0"
-source = { git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=python&rev=ad0895f1c2015eb31bd364b40741b0f7cd6e0048#ad0895f1c2015eb31bd364b40741b0f7cd6e0048" }
+source = { git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=packages%2Fpython-sdk&rev=292a67aebe534769d9be7c9fea72bd94fc20c8f6#292a67aebe534769d9be7c9fea72bd94fc20c8f6" }
 
 [[package]]
 name = "quant-backtest-runtime"
@@ -1288,8 +1288,8 @@ docs = [
 
 [package.metadata]
 requires-dist = [
-    { name = "quant-backtest-core", extras = ["minute"], marker = "extra == 'engine'", git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=core&rev=ad0895f1c2015eb31bd364b40741b0f7cd6e0048" },
-    { name = "quant-backtest-engine-client", marker = "extra == 'engine'", git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=python&rev=ad0895f1c2015eb31bd364b40741b0f7cd6e0048" },
+    { name = "quant-backtest-core", extras = ["minute"], marker = "extra == 'engine'", git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=packages%2Fcore&rev=292a67aebe534769d9be7c9fea72bd94fc20c8f6" },
+    { name = "quant-backtest-engine-client", marker = "extra == 'engine'", git = "https://github.com/runchengxie/quant-backtest-engine.git?subdirectory=packages%2Fpython-sdk&rev=292a67aebe534769d9be7c9fea72bd94fc20c8f6" },
     { name = "quant-platform", marker = "extra == 'legacy'", git = "https://github.com/runchengxie/quant-platform.git?rev=7a618bddd8fdeee5dbe37fe5b54a9698e0de5355" },
 ]
 provides-extras = ["engine", "legacy"]
