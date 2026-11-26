@@ -117,7 +117,33 @@ def test_invalid_preflight_creates_no_database(queued):
     assert not queued.database.exists()
 
 
-@pytest.mark.parametrize("action", ["cancel", "timeout", "kill", "restart"])
+def wait_for_engine_or_timeout(runtime, job_id, pidfile, preflight_pid, timeout_action):
+    deadline = time.monotonic() + 3
+    while pidfile.read_text() == preflight_pid and time.monotonic() < deadline:
+        if timeout_action and runtime.call("status", job_id)["status"] == "FAILED":
+            break
+        time.sleep(0.01)
+    return pidfile.read_text() != preflight_pid
+
+
+def child_is_running(pid):
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().split()[2] != "Z"
+    except FileNotFoundError:
+        return False
+
+
+def assert_children_exited(child_pids):
+    for child_pid in child_pids:
+        deadline = time.monotonic() + 3
+        while child_is_running(child_pid) and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert not child_is_running(child_pid)
+
+
+@pytest.mark.parametrize(
+    "action", ["cancel", "timeout", "startup_timeout", "kill", "restart"]
+)
 def test_queued_lifecycle_controls(queued, action):
     binary, _ = fake_engine(queued.root)
     # Start/ready works during preflight; computation blocks on first session.
@@ -141,19 +167,38 @@ def test_queued_lifecycle_controls(queued, action):
     )
     queued.engine = binary
     request = mapping(queued, binary)
-    if action == "timeout":
+    if action in {"timeout", "startup_timeout"}:
         request["budgets"]["wall_seconds"] = 1
     submitted = call(queued, "submit", str(queued.write(request)), "--queue")
     job_id = submitted["job_id"]
     preflight_pid = pidfile.read_text()
+    adapter_pidfile = queued.root / "adapter.pid"
+    if action == "startup_timeout":
+        # The job budget includes adapter startup, before any engine can exist.
+        launcher = queued.root / "slow-adapter-python"
+        launcher.write_text(
+            "#!/usr/bin/python3\nimport os, sys, time\n"
+            'if "stage" in sys.argv:\n'
+            f'    with open({str(adapter_pidfile)!r}, "w") as target:\n'
+            "        target.write(str(os.getpid()))\n    time.sleep(30)\n"
+            f"os.execv({sys.executable!r}, [{sys.executable!r}, *sys.argv[1:]])\n"
+        )
+        launcher.chmod(0o700)
+        queued.python = str(launcher)
     scheduler = serve(queued)
     try:
         running = queued.wait(job_id, {"RUNNING"})
-        deadline = time.monotonic() + 3
-        while pidfile.read_text() == preflight_pid and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert pidfile.read_text() != preflight_pid
-        engine_pid = int(pidfile.read_text())
+        timeout_action = action in {"timeout", "startup_timeout"}
+        # Startup consumes the same wall budget as computation. A timeout may
+        # correctly finish before a replacement engine process has been created.
+        engine_started = wait_for_engine_or_timeout(
+            queued, job_id, pidfile, preflight_pid, timeout_action
+        )
+        assert engine_started or timeout_action
+        child_pids = [int(pidfile.read_text())] if engine_started else []
+        if action == "startup_timeout":
+            assert not engine_started
+            child_pids.append(int(adapter_pidfile.read_text()))
         if action == "restart":
             scheduler.kill()
             scheduler.communicate(timeout=10)
@@ -173,16 +218,10 @@ def test_queued_lifecycle_controls(queued, action):
         assert status["status"] == (
             "CANCELLED" if action in {"cancel", "restart"} else "FAILED"
         ), status
-        if action == "timeout":
+        if timeout_action:
             assert status["error_code"] == "JOB_TIMEOUT"
         assert not (queued.results / job_id).exists()
-        deadline = time.monotonic() + 3
-        process = Path(f"/proc/{engine_pid}/stat")
-        while process.exists() and time.monotonic() < deadline:
-            if process.read_text().split()[2] == "Z":
-                break
-            time.sleep(0.01)
-        assert not process.exists() or process.read_text().split()[2] == "Z"
+        assert_children_exited(child_pids)
     finally:
         if scheduler.poll() is None:
             scheduler.terminate()
@@ -265,7 +304,10 @@ def test_one_wall_deadline_spans_stage_and_verification(queued):
         "#!/usr/bin/python3\nimport os,sys,time\n"
         "operation=sys.argv[3]\n"
         f"if operation=='verify': open({str(marker)!r},'w').write('started')\n"
-        "if operation in ('stage','verify'): time.sleep(0.6)\n"
+        # Isolate the Go deadline from machine-dependent Python import time.
+        # Other queue tests exercise the full stage and verification adapters.
+        "if operation in ('stage','verify'):\n"
+        "    time.sleep(0.6)\n    print('{}')\n    sys.exit(0)\n"
         f"os.execv({sys.executable!r},[{sys.executable!r},*sys.argv[1:]])\n"
     )
     wrapper.chmod(0o700)
