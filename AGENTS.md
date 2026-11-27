@@ -4,7 +4,7 @@
 
 由用户本人提交，或由用户明确委托 agent 完成的 PR，无需单独的人工 review；这是持续有效的授权，不需要逐个 PR 确认，并覆盖本文件中的一般 PR review 要求。必需检查仍须通过，冲突必须解决；不得绕过 hooks 或 GitHub 分支保护、ruleset 强制要求的审批。
 
-本仓库维护通用回测任务协议、SQLite 状态、worker、资源控制、产物校验、CLI 和发布工具。策略、研究来源记录和晋升规则属于 `quant-research`。独立 Rust 引擎入口和 NautilusTrader 适配属于 `quant-backtest-engine`；现有 Python 回测算法、执行模拟和结果协议继续在 `quant-platform` 维护作为兼容对照。runtime 不实现撮合或组合构造。
+本仓库维护通用回测任务协议、SQLite 状态、worker、资源控制、产物校验、CLI 和发布工具。策略、研究来源记录和晋升规则属于 `quant-research`。独立 Rust 引擎入口和 NautilusTrader 适配属于 `quant-backtest-engine`；当前可复用 Python 金融核算和执行模拟由 Engine 的 `quant-backtest-core` 维护。`legacy` extra 固定的旧 `quant-platform` 版本仅用于 v1–v4 兼容执行、结果读取与历史对照，不代表当前实现的所有权。runtime 不实现撮合或组合构造。
 
 Go 生命周期实现位于 `cmd/backtest-job` 和 `internal/`。Python 兼容包及无状态金融适配器位于 `src/backtest_runtime`。Go 管理同一任务库时，Python 适配器只能计算与写入暂存文件，不能变更任务状态或发布最终目录。
 
